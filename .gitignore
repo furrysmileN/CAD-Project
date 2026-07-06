@@ -1,0 +1,19 @@
+# Large directories (data / models / third-party code)
+models/
+benchcad_codegen_qwen/
+PointTransformerV3/
+BenchCAD/
+
+# Training artifacts and checkpoints
+modified_cadrille/work_dirs*/
+
+# Local environment and caches
+.autodl/
+.Trash-0/
+.cache/
+**/__pycache__/
+**/.ipynb_checkpoints/
+*.pyc
+
+# Local PDF source
+代码.pdf

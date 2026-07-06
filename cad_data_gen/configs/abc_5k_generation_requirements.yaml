@@ -1,0 +1,58 @@
+# cad_data_gen/configs/abc_5k_generation_requirements.yaml
+# ABC 5k 正式数据生成要求；后续任务应优先查证本文件。
+# 本文件只记录规格与约定，不存放密钥明文。
+
+dataset:
+  name: abc_5k_formal
+  work_root: /apdcephfs_cq8/share_1367250/jackjliu/cad/cad_data_gen/data/abc_5k_work
+  staging_root: /apdcephfs_cq8/share_1367250/jackjliu/cad/cad_data_gen/data/abc_5k_staging
+  step_root: /apdcephfs_cq8/share_1367250/jackjliu/cad/cad_data_gen/data/test_step
+  ofs_root: /apdcephfs_cq8/share_1367250/jackjliu/cad/cad_data_gen/data/test_ofs
+  require_ofs: true
+  paired_samples: 4858
+  step_only_samples: 142
+  batch_prefix: prod_
+  max_samples_per_batch: 100
+
+assets:
+  point_cloud_points: 8192
+  image_size: 512
+  base_views_per_sample: 8
+  render_backend: blender-step
+  blender_style: visualization
+  blender_bin: /data/home/jackjliu/bin/blender
+  output_manifest: /apdcephfs_cq8/share_1367250/jackjliu/cad/cad_data_gen/data/abc_5k_work/assets/manifest.jsonl
+
+occlusion:
+  enabled: true
+  point_cloud_points: 8192
+  image_size: 512
+  occlusion_views_per_sample: 8
+  variants_per_sample: 1
+  output_manifest: /apdcephfs_cq8/share_1367250/jackjliu/cad/cad_data_gen/data/abc_5k_work/occlusion/manifest.jsonl
+  note: 遮挡增强应单独生成和记录，不与光照多样性、相机角度变化或相机抖动叠加。
+
+description:
+  enabled: true
+  include_render_images: true
+  max_images: 6
+  image_source: base_views
+  output_dir: /apdcephfs_cq8/share_1367250/jackjliu/cad/cad_data_gen/data/abc_5k_work/descriptions_parallel_cn
+  api_key_file: /apdcephfs_cq8/share_1367250/jackjliu/cad/qwen api key.md
+  api_base: https://dashscope.aliyuncs.com/compatible-mode/v1
+  model: qwen3-omni-flash
+  api_key_env: QWEN_API_KEY
+  qps: 0.2
+  resume: true
+
+recommended_commands:
+  stage_assets_args: >-
+    --num-points 8192 --num-views 6 --img-size 512 --num-processes 1
+    --blender-bin /data/home/jackjliu/bin/blender
+  stage_occlusion_args: >-
+    --num-points 8192 --num-views 6 --img-size 512 --num-processes 1
+    --variants-per-sample 1 --blender-bin /data/home/jackjliu/bin/blender
+  describe_args: >-
+    --api-key-file /apdcephfs_cq8/share_1367250/jackjliu/cad/qwen\ api\ key.md
+    --api-base https://dashscope.aliyuncs.com/compatible-mode/v1
+    --model qwen3-omni-flash --max-images 6 --resume --qps 0.2

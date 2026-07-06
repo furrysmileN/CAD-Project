@@ -1,0 +1,291 @@
+[
+  {
+    "path": "modified_cadrille/filter.py",
+    "title": "filter",
+    "pages": "6-10",
+    "lines": 180,
+    "notes": []
+  },
+  {
+    "path": "modified_cadrille/train_qwen.py",
+    "title": "train qwen",
+    "pages": "12-25",
+    "lines": 602,
+    "notes": []
+  },
+  {
+    "path": "modified_cadrille/configs-qwn3_train.yaml",
+    "title": "configs-qwn3 train",
+    "pages": "28-29",
+    "lines": 68,
+    "notes": []
+  },
+  {
+    "path": "cad_data_gen/train_qwen3vl_point_finetune.py",
+    "title": "train finetune",
+    "pages": "32-47",
+    "lines": 602,
+    "notes": []
+  },
+  {
+    "path": "cad_data_gen/step_mesh_backends.py",
+    "title": "mesh backends",
+    "pages": "49-55",
+    "lines": 292,
+    "notes": []
+  },
+  {
+    "path": "cad_data_gen/step_assets.py",
+    "title": "step assets",
+    "pages": "57-58",
+    "lines": 64,
+    "notes": []
+  },
+  {
+    "path": "cad_data_gen/qwen3vl_sync_baseline.py",
+    "title": "qwen sync baseline",
+    "pages": "60-62",
+    "lines": 116,
+    "notes": []
+  },
+  {
+    "path": "cad_data_gen/qwen3vl_point_ablation.py",
+    "title": "qwen point ablation",
+    "pages": "64-66",
+    "lines": 104,
+    "notes": []
+  },
+  {
+    "path": "cad_data_gen/run_abc_batch.py",
+    "title": "abc batch",
+    "pages": "68-80",
+    "lines": 542,
+    "notes": []
+  },
+  {
+    "path": "cad_data_gen/render_step_with_blender.py",
+    "title": "render step with blender",
+    "pages": "82-95",
+    "lines": 582,
+    "notes": []
+  },
+  {
+    "path": "cad_data_gen/pointcloud.py",
+    "title": "点云",
+    "pages": "96-96",
+    "lines": 20,
+    "notes": []
+  },
+  {
+    "path": "cad_data_gen/pipeline_state.py",
+    "title": "pipline state",
+    "pages": "98-99",
+    "lines": 86,
+    "notes": []
+  },
+  {
+    "path": "cad_data_gen/clean_cad_contexts.py",
+    "title": "clean context",
+    "pages": "101-106",
+    "lines": 240,
+    "notes": []
+  },
+  {
+    "path": "cad_data_gen/cad_code_to_mesh.py",
+    "title": "cad code to mesh",
+    "pages": "109-110",
+    "lines": 51,
+    "notes": []
+  },
+  {
+    "path": "cad_data_gen/cad_context_cleaner.py",
+    "title": "cad 文本清理",
+    "pages": "112-121",
+    "lines": 379,
+    "notes": [
+      "page 121: appended unnumbered continuation"
+    ]
+  },
+  {
+    "path": "cad_data_gen/build_step_assets.py",
+    "title": "step资产",
+    "pages": "123-136",
+    "lines": 602,
+    "notes": []
+  },
+  {
+    "path": "cad_data_gen/build_residual_step_files.py",
+    "title": "残差step文件",
+    "pages": "138-141",
+    "lines": 158,
+    "notes": []
+  },
+  {
+    "path": "cad_data_gen/build_occlusion_assets.py",
+    "title": "遮挡资产",
+    "pages": "143-156",
+    "lines": 602,
+    "notes": []
+  },
+  {
+    "path": "cad_data_gen/abc_batch/stage_occlusion.py",
+    "title": "stage occlusion",
+    "pages": "158-164",
+    "lines": 278,
+    "notes": []
+  },
+  {
+    "path": "cad_data_gen/abc_batch/stage_describe.py",
+    "title": "stage describe",
+    "pages": "166-174",
+    "lines": 385,
+    "notes": []
+  },
+  {
+    "path": "cad_data_gen/abc_batch/stage_batch_inputs.py",
+    "title": "stage batch inputs",
+    "pages": "176-185",
+    "lines": 418,
+    "notes": []
+  },
+  {
+    "path": "cad_data_gen/abc_batch/stage_assets.py",
+    "title": "stage assets",
+    "pages": "187-200",
+    "lines": 602,
+    "notes": []
+  },
+  {
+    "path": "cad_data_gen/abc_batch/post_archive_describe.py",
+    "title": "post_archive_describe",
+    "pages": "202-207",
+    "lines": 255,
+    "notes": []
+  },
+  {
+    "path": "cad_data_gen/abc_batch/paths.py",
+    "title": "path",
+    "pages": "209-213",
+    "lines": 203,
+    "notes": []
+  },
+  {
+    "path": "cad_data_gen/abc_batch/pair_samples.py",
+    "title": "pair sample",
+    "pages": "215-224",
+    "lines": 438,
+    "notes": []
+  },
+  {
+    "path": "cad_data_gen/abc_batch/make_batches.py",
+    "title": "make batch",
+    "pages": "226-232",
+    "lines": 293,
+    "notes": []
+  },
+  {
+    "path": "cad_data_gen/abc_batch/logging_utils.py",
+    "title": "logging_utils",
+    "pages": "234-236",
+    "lines": 115,
+    "notes": []
+  },
+  {
+    "path": "cad_data_gen/abc_batch/global_index.py",
+    "title": "global_index",
+    "pages": "238-243",
+    "lines": 261,
+    "notes": []
+  },
+  {
+    "path": "cad_data_gen/abc_batch/follow_describe_assets.py",
+    "title": "follow_describe_asset",
+    "pages": "246-260",
+    "lines": 602,
+    "notes": []
+  },
+  {
+    "path": "cad_data_gen/abc_batch/extract_archives.py",
+    "title": "extract.archive",
+    "pages": "262-273",
+    "lines": 535,
+    "notes": []
+  },
+  {
+    "path": "cad_data_gen/abc_batch/cleanup_report.py",
+    "title": "cleanup_report",
+    "pages": "275-279",
+    "lines": 222,
+    "notes": []
+  },
+  {
+    "path": "cad_data_gen/abc_batch/archive_batch.py",
+    "title": "archive.batch",
+    "pages": "282-289",
+    "lines": 360,
+    "notes": []
+  },
+  {
+    "path": "cad_data_gen/abc_batch/__init__.py",
+    "title": "init",
+    "pages": "291-291",
+    "lines": 25,
+    "notes": []
+  },
+  {
+    "path": "cad_data_gen/encoder/training.py",
+    "title": "training",
+    "pages": "294-301",
+    "lines": 338,
+    "notes": []
+  },
+  {
+    "path": "cad_data_gen/encoder/preprocess.py",
+    "title": "preprocess",
+    "pages": "304-309",
+    "lines": 233,
+    "notes": []
+  },
+  {
+    "path": "cad_data_gen/encoder/logging_utils.py",
+    "title": "logging utils",
+    "pages": "311-312",
+    "lines": 45,
+    "notes": []
+  },
+  {
+    "path": "cad_data_gen/encoder/core.py",
+    "title": "core",
+    "pages": "314-319",
+    "lines": 229,
+    "notes": []
+  },
+  {
+    "path": "cad_data_gen/encoder/config.py",
+    "title": "config",
+    "pages": "321-323",
+    "lines": 105,
+    "notes": []
+  },
+  {
+    "path": "cad_data_gen/encoder/batch.py",
+    "title": "batch",
+    "pages": "325-330",
+    "lines": 243,
+    "notes": []
+  },
+  {
+    "path": "cad_data_gen/encoder/__init__.py",
+    "title": "init",
+    "pages": "332-333",
+    "lines": 76,
+    "notes": []
+  },
+  {
+    "path": "cad_data_gen/configs/abc_5k_generation_requirements.yaml",
+    "title": "# cad_data_gen/configs/abc_5k_generation_requirements.yaml",
+    "pages": "335-336",
+    "lines": 58,
+    "notes": []
+  }
+]

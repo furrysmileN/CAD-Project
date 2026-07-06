@@ -1,0 +1,36 @@
+# Minimal runnable configuration for:
+#   python -m cad_data_gen.run_abc_batch --config cad_data_gen/configs/abc_batch_default.yaml
+#
+# Override these paths on the command line for real data:
+#   --abc-root /path/to/ABCdataset --work-root /path/to/work_root
+abc_root: ./data/ABCdataset
+work_root: ./data/abc_work
+
+skip_extract: false
+skip_pair: false
+skip_assets: false
+skip_occlusion: true
+skip_description: true
+
+max_extract_workers: 4
+
+pair:
+  offset: 0
+  limit:
+  require_ofs: false
+  scan_ofs: false
+
+assets:
+  require_ofs_for_assets: false
+  num_points: 8192
+  num_views: 8
+  img_size: 512
+  num_processes: 1
+  render_backend: trimesh
+  step_mesh_backend: freecad
+  step_mesh_fallback_backends: cadquery
+  step_mesh_format: stl
+  freecad_cmd: freecadcmd
+  incremental_manifest: true
+  resume_manifest: true
+  skip_existing: true

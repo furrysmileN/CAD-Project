@@ -1,0 +1,65 @@
+{
+  "python_files": 39,
+  "python_passed": 25,
+  "python_errors": [
+    {
+      "path": "cad_data_gen/abc_batch/follow_describe_assets.py",
+      "error": "  File \"/root/autodl-tmp/cad_data_gen/abc_batch/follow_describe_assets.py\", line 220\n    nce(row.get(\"conversion_metadata\"), dict) else None,mesh_metrics=row.get(\"mesh_metrics\") if isinstance(row.get(\"m\n                                                                                                                   ^\nSyntaxError: unterminated string literal (detected at line 220)\n"
+    },
+    {
+      "path": "cad_data_gen/abc_batch/make_batches.py",
+      "error": "  File \"/root/autodl-tmp/cad_data_gen/abc_batch/make_batches.py\", line 182\n    -max-input-bytes\")\n                    ^\nSyntaxError: unterminated string literal (detected at line 182)\n"
+    },
+    {
+      "path": "cad_data_gen/abc_batch/stage_assets.py",
+      "error": "  File \"/root/autodl-tmp/cad_data_gen/abc_batch/stage_assets.py\", line 602\n    return res\n              ^\nSyntaxError: expected 'except' or 'finally' block\n"
+    },
+    {
+      "path": "cad_data_gen/abc_batch/stage_describe.py",
+      "error": "  File \"/root/autodl-tmp/cad_data_gen/abc_batch/stage_describe.py\", line 228\n    t}\"\n     ^\nSyntaxError: unmatched '}'\n"
+    },
+    {
+      "path": "cad_data_gen/build_occlusion_assets.py",
+      "error": "  File \"/root/autodl-tmp/cad_data_gen/build_occlusion_assets.py\", line 600\n    def _apply_mask_visualization(\n                                 ^\nSyntaxError: '(' was never closed\n"
+    },
+    {
+      "path": "cad_data_gen/build_step_assets.py",
+      "error": "  File \"/root/autodl-tmp/cad_data_gen/build_step_assets.py\", line 487\n    2)):\n     ^\nSyntaxError: unmatched ')'\n"
+    },
+    {
+      "path": "cad_data_gen/cad_context_cleaner.py",
+      "error": "Sorry: IndentationError: unexpected indent (cad_context_cleaner.py, line 139)"
+    },
+    {
+      "path": "cad_data_gen/clean_cad_contexts.py",
+      "error": "  File \"/root/autodl-tmp/cad_data_gen/clean_cad_contexts.py\", line 87\n    tures=args.raw_max_ofs_features)\n                                   ^\nSyntaxError: unmatched ')'\n"
+    },
+    {
+      "path": "cad_data_gen/encoder/core.py",
+      "error": "  File \"/root/autodl-tmp/cad_data_gen/encoder/core.py\", line 130\n    nts))\n       ^\nSyntaxError: unmatched ')'\n"
+    },
+    {
+      "path": "cad_data_gen/render_step_with_blender.py",
+      "error": "  File \"/root/autodl-tmp/cad_data_gen/render_step_with_blender.py\", line 167\n    Any) -> None:\n       ^\nSyntaxError: unmatched ')'\n"
+    },
+    {
+      "path": "cad_data_gen/run_abc_batch.py",
+      "error": "  File \"/root/autodl-tmp/cad_data_gen/run_abc_batch.py\", line 214\n    stderr)\n          ^\nSyntaxError: unmatched ')'\n"
+    },
+    {
+      "path": "cad_data_gen/step_mesh_backends.py",
+      "error": "  File \"/root/autodl-tmp/cad_data_gen/step_mesh_backends.py\", line 212\n    ode {exc.returncode}\"\n                        ^\nSyntaxError: unterminated string literal (detected at line 212)\n"
+    },
+    {
+      "path": "cad_data_gen/train_qwen3vl_point_finetune.py",
+      "error": "  File \"/root/autodl-tmp/cad_data_gen/train_qwen3vl_point_finetune.py\", line 134\n    ize)logger = JsonlLogger(output_dir / f\"train_log_rank{dist_ctx.rank}.jsonl\" if not dist_ctx.is_main else output_dir / \"train_log.jsonl\", enabled=\n       ^\nSyntaxError: unmatched ')'\n"
+    },
+    {
+      "path": "modified_cadrille/train_qwen.py",
+      "error": "  File \"/root/autodl-tmp/modified_cadrille/train_qwen.py\", line 409\n    essage)s\")\n          ^\nSyntaxError: unmatched ')'\n"
+    }
+  ],
+  "yaml_files": 2,
+  "yaml_errors": [],
+  "ignored_pages": "337-394"
+}

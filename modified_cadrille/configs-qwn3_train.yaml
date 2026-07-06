@@ -1,0 +1,68 @@
+paths:
+  output_root: ./work_dirs_qwen3vl
+
+data:
+  index_path: ./data/benchcad_index.jsonl
+  train_split: train
+  val_split: val
+  prompt: Generate cadquery code
+  max_images: 4
+  pointcloud_adapter: serialize
+  pointcloud_num_points: 256
+  pointcloud_precision: 4
+
+model:
+  model_path: /root/autodl-tmp/models/Qwen3-VL-2B-Instruct
+  dtype: bfloat16
+  trust_remote_code: true
+  padding_side: left
+  attn_implementation: auto
+  min_pixels: 200704
+  max_pixels: 1003520
+
+training:
+  train_mode: lora
+  precision: bf16
+  per_device_train_batch_size: 1
+  per_device_eval_batch_size: 1
+  gradient_accumulation_steps: 8
+  gradient_checkpointing: true
+  dataloader_num_workers: 4
+  dataloader_pin_memory: true
+  learning_rate: 2.0e-4
+  weight_decay: 0.01
+  warmup_steps: 100
+  lr_scheduler_type: cosine
+  max_steps: 10000
+  num_train_epochs: 1
+  logging_steps: 10
+  save_strategy: steps
+  save_steps: 500
+  save_total_limit: 3
+  evaluation_strategy: steps
+  eval_steps: 500
+  ddp_find_unused_parameters: false
+  load_best_model_at_end: false
+  metric_for_best_model: eval_loss
+  greater_is_better: false
+  resume_from_checkpoint: null
+
+lora:
+  r: 16
+  alpha: 32
+  dropout: 0.05
+  bias: none
+  task_type: CAUSAL_LM
+  target_modules:
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+    - up_proj
+    - down_proj
+    - gate_proj
+
+experiment:
+  run_name: qwen3vl_benchcad_lora
+  seed: 42
+  log_level: INFO
