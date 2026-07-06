@@ -600,3 +600,635 @@ def _make_model_anchored_foreground_occluder_config(
 def _apply_mask_visualization(
     image_path: Path,
     mask: Image.Image,
+    color: Sequence[int],
+    alpha: float = 1.0,
+) -> Image.Image:
+    image = Image.open(image_path).convert("RGB")
+    mask_l = mask.convert("L")
+    alpha = float(np.clip(alpha, 0.0, 1.0))
+    if alpha <= 0.0:
+        return image
+    if alpha < 1.0:
+        mask_np = np.asarray(mask_l, dtype=np.float32) * alpha
+        mask_l = Image.fromarray(mask_np.clip(0, 255).astype(np.uint8), mode="L")
+    overlay = Image.new("RGB", image.size, tuple(int(v) for v in color[:3]))
+    composed = Image.composite(overlay, image, mask_l)
+    return composed
+
+
+def _relative_or_absolute(path: Path, root: Path) -> str:
+    try:
+        return str(path.relative_to(root))
+    except ValueError:
+        return str(path)
+
+
+def _resolve_record_path(raw: Any, base_dir: Path) -> Optional[Path]:
+    if not raw:
+        return None
+    path = Path(str(raw))
+    if path.is_absolute():
+        return path
+    return (base_dir / path).resolve()
+
+
+def _resolve_images(record: dict[str, Any], base_dir: Path, max_views: int) -> list[Path]:
+    values: list[Any] = []
+    if isinstance(record.get("image_paths"), list):
+        values.extend(record["image_paths"])
+    if isinstance(record.get("images"), list):
+        values.extend(record["images"])
+    if record.get("image_path"):
+        values.append(record["image_path"])
+    paths: list[Path] = []
+    for item in values:
+        p = _resolve_record_path(item, base_dir)
+        if p is not None and p.exists():
+            paths.append(p)
+        if len(paths) >= max_views:
+            break
+    return paths
+
+
+def _load_points(path: Path) -> np.ndarray:
+    data = np.load(path)
+    if isinstance(data, np.lib.npyio.NpzFile):
+        if "points" in data:
+            arr = np.asarray(data["points"], dtype=np.float32)
+        elif len(data.files) > 0:
+            arr = np.asarray(data[data.files[0]], dtype=np.float32)
+        else:
+            raise ValueError(f"empty npz file: {path}")
+    else:
+        arr = np.asarray(data, dtype=np.float32)
+    if arr.ndim != 2 or arr.shape[1] < 3:
+        raise ValueError(f"point cloud must be [N,>=3], got {arr.shape}")
+    return arr[:, :3]
+
+
+def _save_points(path: Path, points: np.ndarray) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    np.savez_compressed(path, points=np.asarray(points, dtype=np.float32))
+
+
+def _ensure_mesh_centered(
+    record: dict[str, Any],
+    args: ProcessArgs,
+) -> Optional[trimesh.Trimesh]:
+    step_path = _resolve_record_path(record.get("step_path"), args.step_root)
+    if step_path is None or not step_path.exists():
+        rel_step = record.get("relative_step_path")
+        if rel_step:
+            step_path = _resolve_record_path(rel_step, args.step_root)
+    if step_path is None or not step_path.exists():
+        return None
+    mesh = load_step_as_mesh(
+        step_path,
+        backend=args.step_mesh_backend,
+        fallback_backends=args.step_mesh_fallback_backends,
+        freecad_cmd=args.freecad_cmd,
+        timeout_s=args.step_mesh_timeout_s,
+        work_dir=args.step_mesh_work_dir,
+        export_format=args.step_mesh_format,
+    )
+    if mesh.is_empty:
+        return None
+    return normalize_trimesh_unit_cube(mesh)
+
+
+def _random_foreground_occluder_config(
+    num_views: int,
+    seed: int,
+    color: Sequence[int],
+    size_min: float,
+    size_max: float,
+    depth: float,
+) -> dict[str, Any]:
+    rng = np.random.default_rng(seed)
+    shapes = ("rectangle", "ellipse", "triangle", "hexagon")
+    views: list[dict[str, Any]] = []
+    for _ in range(num_views):
+        width = float(rng.uniform(size_min, size_max))
+        height = float(rng.uniform(size_min, size_max))
+        max_x = max(0.0, 0.5 - width * 0.5)
+        max_y = max(0.0, 0.5 - height * 0.5)
+        views.append(
+            {
+                "offset_xy": [
+                    float(rng.uniform(-max_x, max_x)),
+                    float(rng.uniform(-max_y, max_y)),
+                ],
+                "size_xy": [width, height],
+                "angle_degrees": float(rng.uniform(-22.0, 22.0)),
+                "shape": str(rng.choice(shapes)),
+                "depth": float(depth),
+            }
+        )
+    return {
+        "color": [float(v) / 255.0 for v in (*color, 255)[:4]],
+        "depth": float(depth),
+        "views": views,
+        "placement": "random_frame_anchor",
+    }
+
+
+def _sample_cutout_spec(
+    sample_id: str,
+    variant_index: int,
+    args: ProcessArgs,
+    points_centered: Optional[np.ndarray] = None,
+) -> OcclusionSpec:
+    seed = int(_stable_seed(args.seed, sample_id, variant_index))
+    rng = np.random.default_rng(seed)
+    center = rng.uniform(0.2, 0.8, size=3)
+    size_scalar = float(rng.uniform(args.size_min, args.size_max))
+    size = np.array([size_scalar, size_scalar, size_scalar], dtype=np.float64)
+    if points_centered is not None and len(points_centered) > 0:
+        unit = _unit_points(points_centered)
+        centroid = np.clip(np.mean(unit, axis=0), 0.2, 0.8)
+        center = 0.6 * center + 0.4 * centroid
+    return OcclusionSpec(
+        source_sample_id=sample_id,
+        variant_id=f"occ_{variant_index:03d}",
+        variant_sample_id=f"{sample_id}__occ_{variant_index:03d}",
+        mode=args.mode,
+        target_dims=args.target_dims,
+        primitive="box",
+        center_unit=tuple(float(v) for v in center),
+        size_unit=tuple(float(v) for v in size),
+        seed=seed,
+        views=args.num_views,
+    )
+
+
+def _sample_occluder_spec(sample_id: str, variant_index: int, args: ProcessArgs) -> OcclusionSpec:
+    seed = int(_stable_seed(args.seed, sample_id, variant_index))
+    return OcclusionSpec(
+        source_sample_id=sample_id,
+        variant_id=f"occ_{variant_index:03d}",
+        variant_sample_id=f"{sample_id}__occ_{variant_index:03d}",
+        mode=args.mode,
+        target_dims=args.target_dims,
+        primitive="foreground_plate",
+        center_unit=(0.5, 0.5, 0.5),
+        size_unit=(0.0, 0.0, 0.0),
+        seed=seed,
+        views=args.num_views,
+    )
+
+
+def _render_or_copy_images(
+    source_images: Sequence[Path],
+    image_out_dir: Path,
+    mask_out_dir: Path,
+    args: ProcessArgs,
+    spec: OcclusionSpec,
+    mesh_centered: Optional[trimesh.Trimesh],
+) -> tuple[list[Path], list[Path], dict[str, Any]]:
+    image_out_dir.mkdir(parents=True, exist_ok=True)
+    mask_out_dir.mkdir(parents=True, exist_ok=True)
+    image_paths: list[Path] = []
+    mask_paths: list[Path] = []
+    metadata: dict[str, Any] = {}
+
+    if not source_images:
+        return image_paths, mask_paths, metadata
+
+    view_count = min(len(source_images), args.num_views)
+    size_min = max(0.01, float(args.foreground_occluder_size_min))
+    size_max = max(size_min + 1e-6, float(args.foreground_occluder_size_max))
+    if mesh_centered is not None:
+        occluder_cfg = _make_model_anchored_foreground_occluder_config(
+            mesh_centered=mesh_centered,
+            fronts=get_view_fronts(view_count),
+            img_size=args.img_size,
+            seed=spec.seed,
+            color=args.occluder_color,
+            size_min=size_min,
+            size_max=size_max,
+            depth=args.foreground_occluder_depth,
+        )
+    else:
+        occluder_cfg = _random_foreground_occluder_config(
+            num_views=view_count,
+            seed=spec.seed,
+            color=args.occluder_color,
+            size_min=size_min,
+            size_max=size_max,
+            depth=args.foreground_occluder_depth,
+        )
+    metadata["foreground_occluder"] = occluder_cfg
+
+    for i, src in enumerate(source_images[:view_count]):
+        view = occluder_cfg["views"][i]
+        with Image.open(src) as img:
+            img_rgb = img.convert("RGB")
+            mask = _foreground_mask_for_view(view, img_rgb.size[0]).resize(img_rgb.size, Image.BILINEAR)
+            image_out = image_out_dir / f"view_{i:03d}.png"
+            mask_out = mask_out_dir / f"view_{i:03d}_mask.png"
+            occluded = _apply_mask_visualization(
+                image_path=src,
+                mask=mask,
+                color=args.occluder_color,
+                alpha=1.0,
+            )
+            occluded.save(image_out)
+            mask.save(mask_out)
+        image_paths.append(image_out)
+        mask_paths.append(mask_out)
+    return image_paths, mask_paths, metadata
+
+
+def _cutout_points(points_centered: np.ndarray, spec: OcclusionSpec) -> tuple[np.ndarray, dict[str, Any]]:
+    inside = _points_in_unit_box(points_centered, spec.center_unit, spec.size_unit)
+    keep = ~inside
+    removed = float(inside.mean()) if len(inside) else 0.0
+    if not keep.any():
+        raise ValueError("cutout removed all points")
+    return points_centered[keep], {"point_removed_ratio": removed}
+
+
+def _copy_step_if_requested(
+    record: dict[str, Any],
+    args: ProcessArgs,
+    variant_sample_id: str,
+) -> Optional[Path]:
+    if "step" not in args.target_dims:
+        return None
+    src = _resolve_record_path(record.get("step_path"), args.step_root)
+    if src is None or not src.exists():
+        rel = record.get("relative_step_path")
+        if rel:
+            src = _resolve_record_path(rel, args.step_root)
+    if src is None or not src.exists():
+        return None
+    dst = args.output_dir / "steps" / f"{variant_sample_id}{src.suffix or '.step'}"
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(src, dst)
+    return dst
+
+
+def _process_variant(
+    record: dict[str, Any],
+    args: ProcessArgs,
+    variant_index: int,
+) -> dict[str, Any]:
+    sample_id = str(record.get("sample_id") or f"sample_{variant_index:06d}")
+    source_images = _resolve_images(record, args.source_assets_dir, args.num_views)
+    source_point_path = _resolve_record_path(record.get("point_path"), args.source_assets_dir)
+    mesh_centered: Optional[trimesh.Trimesh] = None
+    source_points: Optional[np.ndarray] = None
+    if source_point_path is not None and source_point_path.exists():
+        source_points = _load_points(source_point_path)
+    if args.mode in {"cutout", "mixed"} or (args.mode == "occluder" and len(source_images) == 0):
+        mesh_centered = _ensure_mesh_centered(record, args)
+
+    use_cutout = args.mode == "cutout"
+    if args.mode == "mixed":
+        use_cutout = variant_index % 2 == 0
+
+    if use_cutout:
+        spec = _sample_cutout_spec(sample_id, variant_index, args, source_points)
+    else:
+        spec = _sample_occluder_spec(sample_id, variant_index, args)
+
+    variant_sample_id = spec.variant_sample_id
+    image_out_dir = args.output_dir / "images" / variant_sample_id
+    mask_out_dir = args.output_dir / "masks" / variant_sample_id
+    point_out = args.output_dir / "points" / f"{variant_sample_id}.npz"
+    label_out = args.output_dir / "labels" / f"{variant_sample_id}.json"
+
+    already_exists = (
+        label_out.exists()
+        and (not ("image" in args.target_dims) or image_out_dir.exists())
+        and (not ("point_cloud" in args.target_dims) or point_out.exists())
+    )
+    if args.skip_existing and already_exists:
+        payload = json.loads(label_out.read_text(encoding="utf-8"))
+        payload.setdefault("status", "skipped_existing")
+        payload.setdefault("sample_id", variant_sample_id)
+        return payload
+
+    image_paths: list[Path] = []
+    mask_paths: list[Path] = []
+    metrics: dict[str, Any] = {}
+
+    if "image" in args.target_dims:
+        if use_cutout:
+            if mesh_centered is None:
+                raise ValueError("cutout mode requires valid STEP mesh")
+            fronts = get_view_fronts(min(len(source_images), args.num_views) or args.num_views)
+            projected_masks = []
+            for front in fronts:
+                projected_masks.append(
+                    _visible_box_mask_for_view(
+                        mesh_centered=mesh_centered,
+                        center_unit=spec.center_unit,
+                        size_unit=spec.size_unit,
+                        front=front,
+                        img_size=args.img_size,
+                    )
+                )
+            image_out_dir.mkdir(parents=True, exist_ok=True)
+            mask_out_dir.mkdir(parents=True, exist_ok=True)
+            for i, src in enumerate(source_images[: len(projected_masks)]):
+                mask = projected_masks[i].convert("L")
+                image_out = image_out_dir / f"view_{i:03d}.png"
+                mask_out = mask_out_dir / f"view_{i:03d}_mask.png"
+                img_occ = _apply_mask_visualization(src, mask, args.occluder_color, alpha=1.0)
+                img_occ.save(image_out)
+                mask.save(mask_out)
+                image_paths.append(image_out)
+                mask_paths.append(mask_out)
+        else:
+            image_paths, mask_paths, img_meta = _render_or_copy_images(
+                source_images=source_images,
+                image_out_dir=image_out_dir,
+                mask_out_dir=mask_out_dir,
+                args=args,
+                spec=spec,
+                mesh_centered=mesh_centered,
+            )
+            metrics.update(img_meta)
+
+    out_point_path: Optional[Path] = None
+    if "point_cloud" in args.target_dims:
+        if source_points is None and source_point_path is not None and source_point_path.exists():
+            source_points = _load_points(source_point_path)
+        if source_points is None:
+            raise ValueError("point_cloud target requested but source points are missing")
+
+        if use_cutout:
+            kept, cut_stats = _cutout_points(source_points, spec)
+            removed = float(cut_stats["point_removed_ratio"])
+            if removed < args.min_removed_ratio or removed > args.max_removed_ratio:
+                raise ValueError(
+                    f"cutout removed ratio {removed:.4f} outside "
+                    f"[{args.min_removed_ratio:.4f}, {args.max_removed_ratio:.4f}]"
+                )
+            if args.num_points is not None:
+                if args.fixed_num_points:
+                    if len(kept) == 0:
+                        raise ValueError("no points left after cutout")
+                    ids = np.linspace(0, len(kept) - 1, int(args.num_points)).round().astype(np.int64)
+                    kept = kept[ids]
+                else:
+                    kept = kept[: int(args.num_points)]
+            _save_points(point_out, kept)
+            metrics.update(cut_stats)
+        else:
+            # occluder mode keeps geometry unchanged; copy source points for compatibility.
+            if source_point_path is not None and source_point_path.exists():
+                point_out.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source_point_path, point_out)
+            else:
+                _save_points(point_out, source_points)
+        out_point_path = point_out
+
+    out_step_path = _copy_step_if_requested(record, args, variant_sample_id)
+    label_payload = {
+        "sample_id": variant_sample_id,
+        "source_sample_id": sample_id,
+        "variant_id": spec.variant_id,
+        "variant_sample_id": variant_sample_id,
+        "status": "done",
+        "occlusion_mode": spec.mode,
+        "target_dims": list(spec.target_dims),
+        "step_path": str(out_step_path) if out_step_path else str(record.get("step_path", "")),
+        "point_path": str(out_point_path) if out_point_path else None,
+        "image_paths": [str(p) for p in image_paths],
+        "mask_paths": [str(p) for p in mask_paths],
+        "label_path": str(label_out),
+        "loader": "build_occlusion_assets",
+        "spec": spec.to_dict(),
+        "metrics": metrics,
+    }
+    _json_dump(label_out, label_payload)
+    return label_payload
+
+
+def _worker_init() -> None:
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+
+
+def _worker_entry(payload: tuple[dict[str, Any], ProcessArgs, int]) -> dict[str, Any]:
+    record, args, variant_index = payload
+    try:
+        return _process_variant(record, args, variant_index)
+    except BaseException as exc:  # noqa: BLE001
+        sample_id = str(record.get("sample_id") or "unknown")
+        return {
+            "sample_id": f"{sample_id}__occ_{variant_index:03d}",
+            "source_sample_id": sample_id,
+            "variant_id": f"occ_{variant_index:03d}",
+            "status": "failed",
+            "error": f"{type(exc).__name__}: {exc}",
+        }
+
+
+def _iter_payloads(
+    records: Sequence[dict[str, Any]],
+    args: ProcessArgs,
+) -> Iterable[tuple[dict[str, Any], ProcessArgs, int]]:
+    for record in records:
+        for variant_index in range(args.variants_per_sample):
+            yield (record, args, variant_index)
+
+
+def _write_jsonl(path: Path, rows: Sequence[dict[str, Any]], append: bool) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    mode = "a" if append else "w"
+    with path.open(mode, encoding="utf-8") as f:
+        for row in rows:
+            f.write(json.dumps(row, ensure_ascii=True) + "\n")
+
+
+def _build_arg_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Build occlusion assets from an existing manifest.")
+    parser.add_argument("--manifest", type=Path, required=True)
+    parser.add_argument("--source-assets-dir", type=Path, required=True)
+    parser.add_argument("--step-root", type=Path, required=True)
+    parser.add_argument("--output-dir", type=Path, required=True)
+
+    parser.add_argument("--target-dims", default="point_cloud,image")
+    parser.add_argument("--mode", choices=sorted(VALID_MODES), default="occluder")
+    parser.add_argument("--num-views", type=int, default=8)
+    parser.add_argument("--img-size", type=int, default=512)
+    parser.add_argument("--camera-distance", type=float, default=2.4)
+    parser.add_argument("--render-width", type=int, default=0)
+    parser.add_argument("--render-height", type=int, default=0)
+    parser.add_argument("--render-backend", default="blender-step")
+    parser.add_argument("--blender-bin", default="")
+    parser.add_argument("--blender-script", type=Path, default=None)
+    parser.add_argument("--blender-engine", default="CYCLES")
+    parser.add_argument("--blender-samples", type=int, default=64)
+    parser.add_argument("--blender-style", default="visualization")
+    parser.add_argument("--blender-device", default="AUTO")
+    parser.add_argument("--visualization-root", type=Path, default=None)
+    parser.add_argument("--step-mesh-backend", default="freecad")
+    parser.add_argument("--step-mesh-fallback-backends", default="")
+    parser.add_argument("--step-mesh-work-dir", type=Path, default=None)
+    parser.add_argument("--step-mesh-format", default="stl")
+    parser.add_argument("--freecad-cmd", default="freecadcmd")
+    parser.add_argument("--step-mesh-timeout-s", type=float, default=None)
+
+    parser.add_argument("--foreground-occluder-size-min", type=float, default=0.20)
+    parser.add_argument("--foreground-occluder-size-max", type=float, default=0.36)
+    parser.add_argument("--foreground-occluder-depth", type=float, default=0.45)
+    parser.add_argument("--triangle-face-tol", type=float, default=1e-4)
+    parser.add_argument("--angle-tol-rads", type=float, default=2.0e-2)
+    parser.add_argument("--variants-per-sample", type=int, default=1)
+    parser.add_argument("--seed", type=int, default=0)
+
+    parser.add_argument("--size-min", type=float, default=0.24)
+    parser.add_argument("--size-max", type=float, default=0.46)
+    parser.add_argument("--min-removed-ratio", type=float, default=0.02)
+    parser.add_argument("--max-removed-ratio", type=float, default=0.35)
+    parser.add_argument("--max-spec-attempts", type=int, default=16)
+    parser.add_argument("--num-points", type=int, default=None)
+    parser.add_argument("--fixed-num-points", action="store_true")
+
+    parser.add_argument("--occluder-color", default="255,158,20")
+    parser.add_argument("--highlight-cutout", action="store_true")
+    parser.add_argument("--highlight-color", default="255,72,72")
+    parser.add_argument("--highlight-alpha", type=float, default=0.70)
+    parser.add_argument("--outline-color", default="255,255,255")
+    parser.add_argument("--outline-width", type=int, default=1)
+
+    parser.add_argument("--num-processes", type=int, default=1)
+    parser.add_argument("--limit", type=int, default=None)
+    parser.add_argument("--skip-existing", action="store_true")
+    parser.add_argument("--append-manifest", action="store_true")
+    return parser
+
+
+def _namespace_to_args(ns: argparse.Namespace) -> ProcessArgs:
+    blender_bin_raw = str(ns.blender_bin) if ns.blender_bin else "blender"
+    blender_bin = resolve_blender_bin(
+        blender_bin_raw,
+        str(ns.blender_style),
+        str(ns.visualization_root) if ns.visualization_root else None,
+    )
+    return ProcessArgs(
+        source_assets_dir=ns.source_assets_dir.resolve(),
+        step_root=ns.step_root.resolve(),
+        output_dir=ns.output_dir.resolve(),
+        target_dims=_parse_dims(ns.target_dims),
+        mode=str(ns.mode),
+        num_views=int(ns.num_views),
+        img_size=int(ns.img_size),
+        camera_distance=float(ns.camera_distance),
+        render_width=int(ns.render_width) if ns.render_width else int(ns.img_size),
+        render_height=int(ns.render_height) if ns.render_height else int(ns.img_size),
+        render_backend=str(ns.render_backend),
+        blender_bin=str(blender_bin),
+        blender_script=ns.blender_script.resolve() if ns.blender_script else None,
+        blender_engine=str(ns.blender_engine),
+        blender_samples=int(ns.blender_samples),
+        blender_style=str(ns.blender_style),
+        blender_device=str(ns.blender_device),
+        step_mesh_backend=str(ns.step_mesh_backend),
+        step_mesh_fallback_backends=parse_fallback_backends(ns.step_mesh_fallback_backends),
+        step_mesh_work_dir=ns.step_mesh_work_dir.resolve() if ns.step_mesh_work_dir else None,
+        step_mesh_format=str(ns.step_mesh_format),
+        freecad_cmd=str(ns.freecad_cmd),
+        step_mesh_timeout_s=float(ns.step_mesh_timeout_s) if ns.step_mesh_timeout_s else None,
+        foreground_occluder_size_min=float(ns.foreground_occluder_size_min),
+        foreground_occluder_size_max=float(ns.foreground_occluder_size_max),
+        foreground_occluder_depth=float(ns.foreground_occluder_depth),
+        triangle_face_tol=float(ns.triangle_face_tol),
+        angle_tol_rads=float(ns.angle_tol_rads),
+        variants_per_sample=int(ns.variants_per_sample),
+        seed=int(ns.seed),
+        size_min=float(ns.size_min),
+        size_max=float(ns.size_max),
+        min_removed_ratio=float(ns.min_removed_ratio),
+        max_removed_ratio=float(ns.max_removed_ratio),
+        max_spec_attempts=int(ns.max_spec_attempts),
+        num_points=int(ns.num_points) if ns.num_points is not None else None,
+        fixed_num_points=bool(ns.fixed_num_points),
+        occluder_color=_parse_color(ns.occluder_color),
+        highlight_cutout=bool(ns.highlight_cutout),
+        highlight_color=_parse_color(ns.highlight_color),
+        highlight_alpha=float(ns.highlight_alpha),
+        outline_color=_parse_color(ns.outline_color),
+        outline_width=int(ns.outline_width),
+        skip_existing=bool(ns.skip_existing),
+    )
+
+
+def _run(records: Sequence[dict[str, Any]], args: ProcessArgs, num_processes: int) -> list[dict[str, Any]]:
+    payloads = list(_iter_payloads(records, args))
+    if num_processes <= 1:
+        return [_worker_entry(payload) for payload in tqdm(payloads, desc="occlusion", unit="variant")]
+    with Pool(processes=num_processes, initializer=_worker_init) as pool:
+        rows: list[dict[str, Any]] = []
+        iterator = pool.imap_unordered(_worker_entry, payloads, chunksize=1)
+        for row in tqdm(iterator, total=len(payloads), desc="occlusion", unit="variant"):
+            rows.append(row)
+        return rows
+
+
+def main(argv: Optional[Sequence[str]] = None) -> int:
+    parser = _build_arg_parser()
+    ns = parser.parse_args(argv)
+    if not ns.manifest.exists():
+        parser.error(f"manifest not found: {ns.manifest}")
+
+    process_args = _namespace_to_args(ns)
+    records = _load_manifest(ns.manifest.resolve(), ns.limit)
+    rows = _run(records, process_args, max(1, int(ns.num_processes)))
+
+    output_dir = process_args.output_dir
+    output_dir.mkdir(parents=True, exist_ok=True)
+    manifest_out = output_dir / "manifest.jsonl"
+    audit_out = output_dir / "audit.jsonl"
+    summary_out = output_dir / "summary.json"
+
+    manifest_rows: list[dict[str, Any]] = []
+    for row in rows:
+        manifest_rows.append(
+            {
+                "sample_id": row.get("sample_id"),
+                "source_sample_id": row.get("source_sample_id"),
+                "variant_id": row.get("variant_id"),
+                "status": row.get("status", "done"),
+                "occlusion_mode": row.get("occlusion_mode", process_args.mode),
+                "target_dims": row.get("target_dims", list(process_args.target_dims)),
+                "step_path": row.get("step_path"),
+                "point_path": row.get("point_path"),
+                "image_paths": row.get("image_paths", []),
+                "mask_paths": row.get("mask_paths", []),
+                "label_path": row.get("label_path"),
+                "loader": row.get("loader", "build_occlusion_assets"),
+                "error": row.get("error"),
+            }
+        )
+
+    _write_jsonl(manifest_out, manifest_rows, append=bool(ns.append_manifest))
+    _write_jsonl(audit_out, rows, append=bool(ns.append_manifest))
+    done = sum(1 for r in rows if r.get("status") in {"done", "skipped_existing"})
+    failed = sum(1 for r in rows if r.get("status") == "failed")
+    summary = {
+        "manifest": str(ns.manifest.resolve()),
+        "output_dir": str(output_dir),
+        "mode": process_args.mode,
+        "target_dims": list(process_args.target_dims),
+        "num_inputs": len(records),
+        "variants_per_sample": process_args.variants_per_sample,
+        "num_variants": len(rows),
+        "done_or_skipped": done,
+        "failed": failed,
+        "num_processes": int(ns.num_processes),
+    }
+    _json_dump(summary_out, summary)
+
+    if failed > 0:
+        print(f"[build_occlusion_assets] completed with failures: {failed}/{len(rows)}", file=sys.stderr)
+        return 1
+    print(f"[build_occlusion_assets] done: {done}/{len(rows)} variants")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # CAD-Project
 
 本仓库包含 CAD 多模态训练与数据流水线的核心代码，仅提交源码，不包含数据集、模型权重与训练产物。
@@ -24,3 +25,6 @@
 ## 说明
 
 `PDF_RESTORE_REPORT.md`、`PDF_RESTORE_MANIFEST.json` 等文件用于记录代码恢复与校验过程，便于追溯。
+=======
+# CAD-Project
+>>>>>>> 3ef16d9b1caa9af4b5d7ff958d1cf36eee999812
