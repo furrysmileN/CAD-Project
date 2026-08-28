@@ -1,0 +1,28 @@
+schema_version: rq2.v6b.readback.v1
+split: probe
+n_pairs: 11
+evidence_keys: [p_full, p_repeat, p_counterfactual]
+repeats: 1
+
+paths:
+  manifest: experiments/rq2_multimodal_harness/outputs/v6_information_complementarity/pilot_v2_minimal_pairs/manifest_probe.jsonl
+  output_root: experiments/rq2_multimodal_harness/outputs/v6_information_complementarity/pilot_v2_minimal_pairs
+
+gates:
+  p_full_min: 0.80
+  p_counterfactual_follow_min: 0.80
+
+api:
+  env_api_key: VLM_API_KEY
+  env_base_url: VLM_BASE_URL
+  env_model: VLM_MODEL
+  default_base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+  default_model: qwen3.8-max
+  timeout_sec: 120
+  max_retries: 3
+  retry_base_sec: 2
+  request_interval_sec: 5
+  temperature: 0
+  max_tokens: 1024
+  json_mode: true
+  extra_body: {enable_thinking: false}

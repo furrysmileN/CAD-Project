@@ -1,0 +1,198 @@
+schema_version: rq2.feedback_n20.v1
+seed: 42
+n: 20
+
+selection:
+  source_manifest: experiments/rq2_multimodal_harness/outputs/pilot_v2/manifest.jsonl
+  expressivity_audit: experiments/rq2_multimodal_harness/outputs/pilot_v2/audits/expressivity.json
+  require_v2_fully_representable: true
+  difficulty_quotas: {easy: 7, medium: 7, hard: 6}
+  complexity_bins: [0, 1, 2]
+  prefer_unique_families: true
+  frozen_manifest: sample_manifest.jsonl
+  summary: selection_summary.json
+
+# 与 encoding_screen_n20 完全一致：复用同一冻结 20 样本清单。
+# 本实验只跑精选 6 条件（conditions.subset），与 A0 复用条件保持一致。
+conditions:
+  count: 63
+  subset: [T2, I1, P1, T2I1, T2I2P1, I1P1]
+  order: [T, I, P, TI, TP, IP, TIP]
+  text_levels: [T1, T2, T3]
+  render_levels: [I1, I2, I3]
+  point_levels: [P1, P2, P3]
+  ids:
+    - T1
+    - T2
+    - T3
+    - I1
+    - I2
+    - I3
+    - P1
+    - P2
+    - P3
+    - T1I1
+    - T1I2
+    - T1I3
+    - T2I1
+    - T2I2
+    - T2I3
+    - T3I1
+    - T3I2
+    - T3I3
+    - T1P1
+    - T1P2
+    - T1P3
+    - T2P1
+    - T2P2
+    - T2P3
+    - T3P1
+    - T3P2
+    - T3P3
+    - I1P1
+    - I1P2
+    - I1P3
+    - I2P1
+    - I2P2
+    - I2P3
+    - I3P1
+    - I3P2
+    - I3P3
+    - T1I1P1
+    - T1I1P2
+    - T1I1P3
+    - T1I2P1
+    - T1I2P2
+    - T1I2P3
+    - T1I3P1
+    - T1I3P2
+    - T1I3P3
+    - T2I1P1
+    - T2I1P2
+    - T2I1P3
+    - T2I2P1
+    - T2I2P2
+    - T2I2P3
+    - T2I3P1
+    - T2I3P2
+    - T2I3P3
+    - T3I1P1
+    - T3I1P2
+    - T3I1P3
+    - T3I2P1
+    - T3I2P2
+    - T3I2P3
+    - T3I3P1
+    - T3I3P2
+    - T3I3P3
+
+modalities:
+  image_max_edge: 512
+  text:
+    source_field: text
+    encodings:
+      T1: {source: L1, version: rq2.text.l1.v1}
+      T2: {source: L3, version: rq2.text.l3.v1}
+      T3:
+        source: L3
+        version: rq2.text.l3_transform.v1
+        transform_api:
+          env_api_key: VLM_API_KEY
+          env_base_url: VLM_BASE_URL
+          env_model: VLM_MODEL
+          default_base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+          default_model: qwen3.8-max
+          timeout_sec: 180
+          max_retries: 3
+          retry_base_sec: 2
+          temperature: 0
+          max_tokens: 2048
+          json_mode: true
+          extra_body: {enable_thinking: false}
+  render:
+    cameras: [front, side, top, isometric]
+    resolution: 512
+    padding: 0.06
+    encodings:
+      I1: {version: rq2.render.rgb.v1, representation: rgb_surface}
+      I2: {version: rq2.render.object_normal.v1, representation: object_space_normal}
+      I3: {version: rq2.render.brep_visible_edges.v1, representation: hidden_line_removed_engineering_drawing}
+  point_cloud:
+    points: 2048
+    cameras: [front, side, top, isometric]
+    resolution: 512
+    padding: 0.06
+    encodings:
+      P1: {version: rq2.pc_discrete_black.v1, representation: discrete_points_no_depth}
+      P2: {version: rq2.pc_discrete_fixed_depth.v1, representation: discrete_points_fixed_depth_color}
+      P3: {version: rq2.pc_depth_contour.v2_fixed_range, representation: depth_contour_fixed_range}
+
+prompt:
+  plan_version: v2
+  max_operations: 64
+  plan_prompt_version: v2
+
+repair:
+  version: harnesscad.repair.v2.1
+  setting: R4
+  rules: [number, rotate_revolve, unit_axis, polygon]
+
+# 实验臂：A0/A1/B1/B2/C（命令行 --arm 可覆盖）。各臂行为由 feedback.ARM_PRESETS 定义：
+#   A0: v2 prompt + 无反馈（复用 encoding_screen_n20 既有结果，不重跑）
+#   A1: v3 prompt + 无反馈
+#   B1: v2 prompt + 1 轮反馈（仅 schema 格式错误）
+#   B2: v2 prompt + 最多 2 轮反馈（schema + execution，反馈轮温度 0.3 自第 1 轮起）
+#   C : v3 prompt + 最多 2 轮反馈（schema + execution）
+# 运行器按 --arm 自动选择 arms.<arm>.output_dir 作为输出目录（--output-dir 可覆盖）。
+# A0 不重跑：分析时直接读 arms.A0.reuse_state_dir 的既有 state（同样本同条件）。
+arms:
+  A0:
+    reuse_state_dir: experiments/rq2_multimodal_harness/outputs/encoding_screen_n20/state
+  A1:
+    output_dir: experiments/rq2_multimodal_harness/outputs/feedback_n20/arms/A1
+  B1:
+    output_dir: experiments/rq2_multimodal_harness/outputs/feedback_n20/arms/B1
+  B2:
+    output_dir: experiments/rq2_multimodal_harness/outputs/feedback_n20/arms/B2
+  C:
+    output_dir: experiments/rq2_multimodal_harness/outputs/feedback_n20/arms/C
+
+feedback:
+  version: harnesscad.feedback.v1
+  arm: custom
+  enabled: false
+  max_rounds: 0
+  # 反馈轮温度：round >= 1 的所有反馈轮统一使用（并非仅"第 2 轮"）。
+  # 字段名 round2_temperature 为历史命名，保留以兼容既有 config 与 state。
+  round2_temperature: 0.3
+  sources: [schema]
+  keep_best: true
+
+api:
+  env_api_key: VLM_API_KEY
+  env_base_url: VLM_BASE_URL
+  env_model: VLM_MODEL
+  default_base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+  default_model: qwen3.8-max
+  timeout_sec: 180
+  max_retries: 3
+  retry_base_sec: 2
+  request_interval_sec: 30
+  temperature: 0
+  max_tokens: 4096
+  json_mode: true
+  extra_body: {enable_thinking: false}
+
+backend:
+  episode_version: v2
+  root: HarnessCAD/HarnessCAD
+  timeout_sec: 30
+
+scoring:
+  point_samples: 2048
+  voxel_resolution: 48
+  failure_aware_tau: 0.25
+
+paths:
+  output: outputs/feedback_n20
+  output_dir: experiments/rq2_multimodal_harness/outputs/feedback_n20

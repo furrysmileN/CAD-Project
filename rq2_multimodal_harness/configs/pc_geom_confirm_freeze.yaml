@@ -1,0 +1,29 @@
+# 由 20×9 筛选冻结，供下一轮 100 样本确认使用。不要在确认阶段改条件集合或证据 schema。
+schema_version: rq2.pc_geom_confirm_freeze.v1
+n: 100
+seed: 42
+model: qwen3.8-max
+harness_arm: C
+evidence_schema: point_evidence.v1
+conditions:
+  - I1
+  - P_proj
+  - P_geom_tool
+  - I1P_proj
+  - I1P_geom
+  - T1I1
+  - T1I1P_proj
+  - T1I1P_geom
+pointcloud:
+  density: 2048
+  seed: 42
+  section_thickness: null
+tools:
+  max_pre_queries: 3
+  max_post_queries: 1
+  timeout_sec: 8
+notes:
+  - 筛选 20×9 完成：176 completed / 3 episode_failed / 1 skipped；204 API 调用。
+  - P_geom_tool − P_proj mean Δjoint_quality ≈ +0.225（探索性，n=20）。
+  - 模型未使用查询工具；P_geom_tool ≈ P_geom_static。确认阶段去掉 P_geom_static。
+  - 旧 P_proj 相对 I1 的互补仍弱（I1P_proj−I1 CI 含 0），与阶段 0 一致。

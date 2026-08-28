@@ -1,0 +1,163 @@
+schema_version: rq2.encoding_screen_n20.v1
+seed: 42
+n: 20
+
+selection:
+  source_manifest: experiments/rq2_multimodal_harness/outputs/pilot_v2/manifest.jsonl
+  expressivity_audit: experiments/rq2_multimodal_harness/outputs/pilot_v2/audits/expressivity.json
+  require_v2_fully_representable: true
+  difficulty_quotas: {easy: 7, medium: 7, hard: 6}
+  complexity_bins: [0, 1, 2]
+  prefer_unique_families: true
+  frozen_manifest: sample_manifest.jsonl
+  summary: selection_summary.json
+
+conditions:
+  count: 63
+  order: [T, I, P, TI, TP, IP, TIP]
+  text_levels: [T1, T2, T3]
+  render_levels: [I1, I2, I3]
+  point_levels: [P1, P2, P3]
+  ids:
+    - T1
+    - T2
+    - T3
+    - I1
+    - I2
+    - I3
+    - P1
+    - P2
+    - P3
+    - T1I1
+    - T1I2
+    - T1I3
+    - T2I1
+    - T2I2
+    - T2I3
+    - T3I1
+    - T3I2
+    - T3I3
+    - T1P1
+    - T1P2
+    - T1P3
+    - T2P1
+    - T2P2
+    - T2P3
+    - T3P1
+    - T3P2
+    - T3P3
+    - I1P1
+    - I1P2
+    - I1P3
+    - I2P1
+    - I2P2
+    - I2P3
+    - I3P1
+    - I3P2
+    - I3P3
+    - T1I1P1
+    - T1I1P2
+    - T1I1P3
+    - T1I2P1
+    - T1I2P2
+    - T1I2P3
+    - T1I3P1
+    - T1I3P2
+    - T1I3P3
+    - T2I1P1
+    - T2I1P2
+    - T2I1P3
+    - T2I2P1
+    - T2I2P2
+    - T2I2P3
+    - T2I3P1
+    - T2I3P2
+    - T2I3P3
+    - T3I1P1
+    - T3I1P2
+    - T3I1P3
+    - T3I2P1
+    - T3I2P2
+    - T3I2P3
+    - T3I3P1
+    - T3I3P2
+    - T3I3P3
+
+modalities:
+  image_max_edge: 512
+  text:
+    source_field: text
+    encodings:
+      T1: {source: L1, version: rq2.text.l1.v1}
+      T2: {source: L3, version: rq2.text.l3.v1}
+      T3:
+        source: L3
+        version: rq2.text.l3_transform.v1
+        transform_api:
+          env_api_key: VLM_API_KEY
+          env_base_url: VLM_BASE_URL
+          env_model: VLM_MODEL
+          default_base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+          default_model: qwen3.8-max
+          timeout_sec: 180
+          max_retries: 3
+          retry_base_sec: 2
+          temperature: 0
+          max_tokens: 2048
+          json_mode: true
+          extra_body: {enable_thinking: false}
+  render:
+    cameras: [front, side, top, isometric]
+    resolution: 512
+    padding: 0.06
+    encodings:
+      I1: {version: rq2.render.rgb.v1, representation: rgb_surface}
+      I2: {version: rq2.render.object_normal.v1, representation: object_space_normal}
+      I3: {version: rq2.render.brep_visible_edges.v1, representation: hidden_line_removed_engineering_drawing}
+  point_cloud:
+    points: 2048
+    cameras: [front, side, top, isometric]
+    resolution: 512
+    padding: 0.06
+    encodings:
+      P1: {version: rq2.pc_discrete_black.v1, representation: discrete_points_no_depth}
+      P2: {version: rq2.pc_discrete_fixed_depth.v1, representation: discrete_points_fixed_depth_color}
+      P3: {version: rq2.pc_depth_contour.v2_fixed_range, representation: depth_contour_fixed_range}
+
+prompt:
+  plan_version: v2
+  max_operations: 64
+
+repair:
+  version: harnesscad.repair.v2.1
+  setting: R4
+  rules: [number, rotate_revolve, unit_axis, polygon]
+
+api:
+  env_api_key: VLM_API_KEY
+  env_base_url: VLM_BASE_URL
+  env_model: VLM_MODEL
+  default_base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+  default_model: qwen3.8-max
+  timeout_sec: 180
+  max_retries: 3
+  retry_base_sec: 2
+  request_interval_sec: 30
+  temperature: 0
+  max_tokens: 4096
+  json_mode: true
+  extra_body: {enable_thinking: false}
+
+backend:
+  episode_version: v2
+  root: HarnessCAD/HarnessCAD
+  timeout_sec: 30
+
+scoring:
+  point_samples: 2048
+  voxel_resolution: 48
+  failure_aware_tau: 0.25
+
+paths:
+  output: outputs/encoding_screen_n20
+  output_dir: experiments/rq2_multimodal_harness/outputs/encoding_screen_n20

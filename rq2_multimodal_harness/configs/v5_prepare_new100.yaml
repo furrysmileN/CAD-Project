@@ -1,0 +1,36 @@
+schema_version: rq2.v5.prepare.v1
+seed: 20260818
+n: 100
+conditions: []
+
+sampling:
+  aligned_pool_size: 1000
+  strata: [family, difficulty, complexity_bin]
+  complexity_bins: 3
+  exclude_manifests:
+    - experiments/rq2_multimodal_harness/outputs/pilot_v2/manifest.jsonl
+  exclude_file: experiments/rq2_multimodal_harness/outputs/v5_complementarity/exclude_debug_ids.txt
+
+modalities:
+  text:
+    source: processed/text_descriptions/benchcad/code_gen_hdv3.jsonl
+    language: en
+    level: L3
+  images:
+    root: processed/renders/benchcad
+    view_ids: [view_0, view_2, view_4, view_6]
+    detail: high
+    max_edge: 1024
+  point_cloud:
+    root: processed/point_clouds/benchcad/2048
+    points: 2048
+    resolution: 512
+    views: [front, side, top, isometric]
+    padding: 0.06
+    encoding_version: rq2.pc_depth_contour.v1
+
+paths:
+  dataset: data/benchcad/code_gen/dataset
+  point_cloud_metadata: processed/point_clouds/benchcad/pointcloud_metadata.jsonl
+  models_dir: processed/models/benchcad
+  output_dir: experiments/rq2_multimodal_harness/outputs/v5_complementarity

@@ -1,0 +1,77 @@
+schema_version: rq2.feedback_confirm.v1
+seed: 42
+n: 100
+# 主矩阵 7 条件（与 pilot_v2 完全一致）
+conditions: [T, I, P, TI, TP, IP, TIP]
+
+# 输入复用 pilot_v2 的冻结 manifest：同一样本、同一文本/渲染/点云编码。
+# 确认实验本身不重新 prepare。
+paths:
+  manifest: experiments/rq2_multimodal_harness/outputs/pilot_v2/manifest.jsonl
+  output_root: experiments/rq2_multimodal_harness/outputs/confirm_n100
+
+# 双臂：--arm 选择；arm 配置决定 prompt 版本、repair 与反馈行为。
+#   A0：qwen3.8-max + v2 prompt + 无 repair + 无反馈（与 pilot_v2 管线一致，仅换模型，
+#       作为模型配对的基线；pilot_v2(3.7-plus) 保留为历史参照）
+#   C ：qwen3.8-max + v3 prompt + repair R4 + 最多 2 轮反馈（schema + execution）
+arms:
+  A0:
+    output_dir: experiments/rq2_multimodal_harness/outputs/confirm_n100/arms/A0
+    plan_version: v2
+    repair:
+      version: none
+      setting: none
+      rules: []
+    feedback:
+      arm: A0
+      enabled: false
+      max_rounds: 0
+      sources: [schema]
+      round2_temperature: 0.3
+      keep_best: true
+  C:
+    output_dir: experiments/rq2_multimodal_harness/outputs/confirm_n100/arms/C
+    plan_version: v3
+    repair:
+      version: harnesscad.repair.v2.1
+      setting: R4
+      rules: [number, rotate_revolve, unit_axis, polygon]
+    feedback:
+      arm: C
+      enabled: true
+      max_rounds: 2
+      sources: [schema, execution]
+      round2_temperature: 0.3
+      keep_best: true
+
+modalities:
+  image_max_edge: 1024
+
+prompt:
+  plan_version: v2
+  max_operations: 64
+
+api:
+  env_api_key: VLM_API_KEY
+  env_base_url: VLM_BASE_URL
+  env_model: VLM_MODEL
+  default_base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+  default_model: qwen3.8-max
+  timeout_sec: 180
+  max_retries: 3
+  retry_base_sec: 2
+  request_interval_sec: 30
+  temperature: 0
+  max_tokens: 4096
+  json_mode: true
+  extra_body: {enable_thinking: false}
+
+backend:
+  episode_version: v2
+  root: HarnessCAD/HarnessCAD
+  timeout_sec: 30
+
+scoring:
+  point_samples: 2048
+  voxel_resolution: 48
+  failure_aware_tau: 0.25

@@ -7,6 +7,13 @@ BenchCAD/
 # Training artifacts and checkpoints
 modified_cadrille/work_dirs*/
 
+# RQ2 experiment data (never commit live outputs / geometry)
+rq2_multimodal_harness/outputs/
+*.npy
+*.step
+*.stp
+*.stl
+
 # Local environment and caches
 .autodl/
 .Trash-0/

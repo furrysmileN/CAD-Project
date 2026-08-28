@@ -1,0 +1,22 @@
+schema_version: rq2.v6.config.frozen.v1
+note: Frozen before live confirm. Do not change after pilot engineering gates pass.
+seed: 20260825
+model_exact_id: qwen3.8-max
+plan_prompt_version: v3
+repair: R4
+feedback_arm: C
+feedback_max_rounds: 2
+keep_best: false
+primary_endpoint: first_attempt
+secondary_endpoint: final_delivery
+primary_metric: joint_quality
+geometry_endpoint: common_frame_cd
+n_pilot: 20
+n_confirm: 100
+conditions: [C0, C1, C2, C3, C4, C5]
+repeats_confirm: [1, 2, 3]
+pointcloud_n: 2048
+pointcloud_seed: 42
+cameras: [front, side, top, isometric]
+dsl: harnesscad.plan.v2
+flange_array_policy: rectangular_grid_no_circular_pattern

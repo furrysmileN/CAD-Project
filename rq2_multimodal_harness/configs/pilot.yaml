@@ -1,0 +1,63 @@
+schema_version: rq2.multimodal_harness.pilot.v1
+seed: 42
+n: 100
+conditions: [T, I, P, TI, TP, IP, TIP]
+
+sampling:
+  aligned_pool_size: 1000
+  strata: [family, difficulty, complexity_bin]
+  complexity_bins: 3
+
+modalities:
+  text:
+    source: processed/text_descriptions/benchcad/code_gen_hdv3.jsonl
+    language: en
+    level: L3
+  images:
+    root: processed/renders/benchcad
+    view_ids: [view_0, view_2, view_4, view_6]
+    detail: high
+    max_edge: 1024
+  point_cloud:
+    root: processed/point_clouds/benchcad/2048
+    points: 2048
+    resolution: 512
+    views: [front, side, top, isometric]
+    padding: 0.06
+    encoding_version: rq2.pc_depth_contour.v1
+
+prompt:
+  plan_version: v2
+  max_operations: 64
+
+api:
+  env_api_key: VLM_API_KEY
+  env_base_url: VLM_BASE_URL
+  env_model: VLM_MODEL
+  default_base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+  default_model: qwen3.7-plus
+  timeout_sec: 180
+  max_retries: 3
+  retry_base_sec: 2
+  temperature: 0
+  max_tokens: 4096
+  json_mode: true
+  extra_body:
+    enable_thinking: false
+
+backend:
+  episode_version: v2
+  root: HarnessCAD/HarnessCAD
+  timeout_sec: 30
+
+scoring:
+  point_samples: 2048
+  voxel_resolution: 48
+  failure_aware_tau: 0.25
+
+paths:
+  dataset: data/benchcad/code_gen/dataset
+  point_cloud_metadata: processed/point_clouds/benchcad/pointcloud_metadata.jsonl
+  models_dir: processed/models/benchcad
+  output_dir: experiments/rq2_multimodal_harness/outputs/pilot_v2
+  conflict_scenes: processed/conflict_scenes

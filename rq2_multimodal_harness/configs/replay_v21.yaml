@@ -1,0 +1,39 @@
+schema_version: rq2.multimodal_harness.replay_v21.v1
+seed: 42
+conditions: [T, I, P, TI, TP, IP, TIP]
+
+baseline:
+  output_dir: experiments/rq2_multimodal_harness/outputs/pilot_v2
+  manifest: experiments/rq2_multimodal_harness/outputs/pilot_v2/manifest.jsonl
+  state_dir: experiments/rq2_multimodal_harness/outputs/pilot_v2/state
+  expected_tasks: 700
+
+repair:
+  version: harnesscad.repair.v2.1
+  settings:
+    R0: []
+    R1: [number, unit_axis]
+    R2: [polygon]
+    R3: [rotate_revolve]
+    R4: [number, rotate_revolve, unit_axis, polygon]
+
+backend:
+  episode_version: v2
+  root: HarnessCAD/HarnessCAD
+  timeout_sec: 30
+
+scoring:
+  point_samples: 2048
+  voxel_resolution: 48
+  failure_aware_tau: 0.25
+
+reproduction:
+  joint_quality_abs_tolerance: 1.0e-12
+  require_exact_status_match: true
+  require_exact_geometry_valid_match: true
+
+analysis:
+  bootstrap_repeats: 5000
+
+paths:
+  output_dir: experiments/rq2_multimodal_harness/outputs/pilot_v21_offline_replay
