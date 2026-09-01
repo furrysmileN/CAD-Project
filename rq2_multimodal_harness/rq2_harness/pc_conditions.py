@@ -63,6 +63,12 @@ V5_TOOL_IDS = (
     "FORCED_QUERY",
 )
 
+V8_I1_ABLATION_IDS = (
+    "I1P_bbox",
+    "I1P_axes",
+    "I1P_sym",
+)
+
 EVIDENCE_PROFILES = ("bbox", "axes", "sym", "full", "partial")
 TEXT_LEVELS = ("T1", "T2")
 TOOL_PROTOCOLS = ("none", "legacy", "query_or_submit", "forced_query")
@@ -161,6 +167,9 @@ _SPECS: dict[str, PCConditionSpec] = {
     "I1P_shuffle": _spec(
         condition_id="I1P_shuffle", images=True, point_geom=True, evidence_profile="full", shuffle=True
     ),
+    "I1P_bbox": _spec(condition_id="I1P_bbox", images=True, point_geom=True, evidence_profile="bbox"),
+    "I1P_axes": _spec(condition_id="I1P_axes", images=True, point_geom=True, evidence_profile="axes"),
+    "I1P_sym": _spec(condition_id="I1P_sym", images=True, point_geom=True, evidence_profile="sym"),
     "STATIC_PARTIAL": _spec(condition_id="STATIC_PARTIAL", point_geom=True, evidence_profile="partial"),
     "OPTIONAL_TOOL": _spec(
         condition_id="OPTIONAL_TOOL",

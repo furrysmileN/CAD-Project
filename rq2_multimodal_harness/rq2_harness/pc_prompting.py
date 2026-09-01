@@ -4,7 +4,8 @@
 [TEXT_INTENT] → [IMAGE_OBSERVATION] → [POINT_OBSERVATION] → [POINT_HYPOTHESIS]
 → [POINT_TOOLS]（仅工具条件）→ plan constraints。
 
-System prompt 沿用 prompting.SYSTEM_PROMPTS["v3"]（Harness C 臂控制变量）。
+System prompt 默认 prompting.SYSTEM_PROMPTS["v3"]（已冻 V5/V8）。
+新栈用 plan_prompt_version="v5"（Plan v3 + 本地姿态/配方）。
 不把真实文件名、GT STEP/code、原始 XYZ 坐标列表写入 prompt。
 """
 from __future__ import annotations
@@ -16,7 +17,9 @@ from pathlib import Path
 from typing import Any
 
 from .common import sha256_json
+from .harness_guidance import build_guidance
 from .pc_conditions import PCConditionSpec, parse_condition
+from .pointcloud.io import PointCloudError, load_point_cloud
 from .pointcloud.tools import tool_manifest
 from .prompting import PLAN_TEMPLATES, SYSTEM_PROMPTS, _image_data_url
 
@@ -333,6 +336,19 @@ def query_or_submit_block(
     )
 
 
+def _row_points(row: dict[str, Any]):
+    path = (row.get("point_cloud") or {}).get("path")
+    if not path:
+        return None
+    npy = Path(str(path))
+    if not npy.is_file():
+        return None
+    try:
+        return load_point_cloud(npy)
+    except (PointCloudError, OSError, ValueError):
+        return None
+
+
 def build_pc_messages(
     row: dict[str, Any],
     spec: PCConditionSpec | str,
@@ -363,7 +379,7 @@ def build_pc_messages(
         "plan_prompt_version": plan_prompt_version,
         "prompt_sample_id": prompt_sample_id,
         "condition_id": spec.condition_id,
-        "slot_order": ["task", "text", "images", "point_proj", "point_geom", "tools", "plan_constraints"],
+        "slot_order": ["task", "text", "images", "point_proj", "point_geom", "guidance", "tools", "plan_constraints"],
         "modality_hashes": {},
         "allowed_modalities": sorted(spec.modalities),
     }
@@ -407,6 +423,23 @@ def build_pc_messages(
             "content_hash": evidence.get("content_hash"),
             "cloud_id": compact.get("cloud_id"),
             "tokens": audit["evidence_tokens"],
+        }
+
+    if plan_prompt_version in {"v5", "v6"}:
+        # 仅照片 / 仅投影条件不得读取 npy；空心半径只允许出现在 point_geom 条件
+        guidance = build_guidance(
+            evidence if isinstance(evidence, dict) else None,
+            points=_row_points(row) if spec.point_geom else None,
+        )
+        if guidance["prompt_block"]:
+            content.append({"type": "text", "text": guidance["prompt_block"]})
+        audit["guidance"] = {
+            "pose": guidance.get("pose"),
+            "decisions": {
+                "generator": ((guidance.get("decisions") or {}).get("generator") or {}).get("id"),
+                "topology": ((guidance.get("decisions") or {}).get("topology") or {}).get("kind"),
+                "path_graph": ((guidance.get("decisions") or {}).get("path_graph") or {}),
+            },
         }
 
     if spec.tool_protocol in {"query_or_submit", "forced_query"}:
@@ -520,6 +553,16 @@ def audit_payload(
         issues.append("POINT_TOOLS 与 tools 开关不一致")
     if spec.point_geom and spec.point_proj:
         issues.append("同一条件同时含 P_proj 与 P_geom")
+    profile = spec.resolved_profile
+    if spec.point_geom and profile == "bbox":
+        if '"symmetry_candidates"' in serialized or '"sections"' in serialized:
+            issues.append("bbox profile 含 symmetry/sections")
+    if spec.point_geom and profile == "axes":
+        if '"symmetry_candidates"' in serialized or '"sections"' in serialized:
+            issues.append("axes profile 含 symmetry/sections")
+    if spec.point_geom and profile == "sym":
+        if '"sections"' in serialized:
+            issues.append("sym profile 含 sections")
     for marker in FORBIDDEN_PROMPT_MARKERS:
         if marker.lower() in serialized.lower():
             issues.append(f"prompt 含禁止标记 {marker}")

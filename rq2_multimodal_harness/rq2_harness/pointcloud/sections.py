@@ -130,6 +130,55 @@ def _is_ring(points_2d: np.ndarray, circle: dict[str, Any] | None) -> bool:
     return float(inner.mean()) < 0.2
 
 
+def _measure_annulus(points_2d: np.ndarray) -> dict[str, float] | None:
+    """最大连通块是否为带壁厚的圆环（空核 + 周向覆盖 + 各角度内外径）。
+
+    不复用 `_is_ring`：那是给内部孤立孔用的。实心盘的代数圆拟合中心会偏，
+    单层表面（实心体的外皮）在中面上看起来也像空核，必须靠「每个角都有可测壁厚」
+    才能和单层线框、实心铺满分开。
+    """
+    if len(points_2d) < 16:
+        return None
+    center = points_2d.mean(axis=0)
+    rel = points_2d - center
+    dists = np.linalg.norm(rel, axis=1)
+    outer = float(np.percentile(dists, 88))
+    if outer <= 1e-9:
+        return None
+    if float((dists < 0.50 * outer).mean()) > 0.12:
+        return None
+    n_bins = 12
+    angles = np.arctan2(rel[:, 1], rel[:, 0])
+    bins = ((angles + np.pi) / (2.0 * np.pi) * n_bins).astype(int) % n_bins
+    inners: list[float] = []
+    outers: list[float] = []
+    occupied = 0
+    for index in range(n_bins):
+        band = dists[bins == index]
+        if len(band) < 2:
+            continue
+        occupied += 1
+        inners.append(float(np.percentile(band, 10)))
+        outers.append(float(np.percentile(band, 90)))
+    if occupied < 8:
+        return None
+    inner_a = np.asarray(inners, dtype=np.float64)
+    outer_a = np.asarray(outers, dtype=np.float64)
+    med_inner = float(np.median(inner_a))
+    med_outer = float(np.median(outer_a))
+    med_thick = float(np.median(outer_a - inner_a))
+    if med_inner <= 0 or med_outer <= 0:
+        return None
+    if med_thick < 0.12 * med_outer or med_inner >= 0.95 * med_outer:
+        return None
+    if float(np.std(inner_a)) > 0.28 * med_inner:
+        return None
+    return {
+        "inner_radius": round(med_inner, 4),
+        "outer_radius": round(med_outer, 4),
+    }
+
+
 def query_cross_section(
     points: np.ndarray,
     origin: np.ndarray,
@@ -213,3 +262,59 @@ def query_cross_section(
     result["loops"] = loops
     result["holes"] = holes
     return result
+
+
+_AXIS_NORMALS = {
+    "X": np.array([1.0, 0.0, 0.0]),
+    "Y": np.array([0.0, 1.0, 0.0]),
+    "Z": np.array([0.0, 0.0, 1.0]),
+}
+
+
+def probe_outer_rings(
+    points: np.ndarray,
+    bbox_size: list[float] | tuple[float, ...] | None = None,
+) -> list[dict[str, Any]]:
+    """在中面与沿各轴的偏移面上，看最大连通块是否为空心圆环。
+
+    中心薄片常常切到折线包络而看不到内环；沿较长轴偏开再切，才能量到
+    内外半径。不使用零件族名，只返回测量。
+    """
+    points = np.asarray(points, dtype=np.float64)
+    if len(points) < 16:
+        return []
+    if bbox_size is None:
+        span = points.max(axis=0) - points.min(axis=0)
+        bbox_size = [float(item) for item in span]
+    thickness = adaptive_thickness(points)
+    hits: list[dict[str, Any]] = []
+    for index, axis in enumerate(("X", "Y", "Z")):
+        extent = float(bbox_size[index])
+        offsets = [0.0]
+        if extent >= 0.12:
+            step = 0.35 * extent / 2.0
+            offsets.extend([-step, step])
+        for offset in offsets:
+            origin = np.zeros(3)
+            origin[index] = offset
+            _slice_3d, slice_2d, _basis = slice_points(
+                points, origin, _AXIS_NORMALS[axis], thickness
+            )
+            if len(slice_2d) < 16:
+                continue
+            components = _components(slice_2d, epsilon=thickness)
+            if not components:
+                continue
+            outer_pts = max(components, key=len)
+            measured = _measure_annulus(outer_pts)
+            if measured is None:
+                continue
+            hits.append(
+                {
+                    "axis": axis,
+                    "offset": round(float(offset), 4),
+                    "inner_radius": measured["inner_radius"],
+                    "outer_radius": measured["outer_radius"],
+                }
+            )
+    return hits

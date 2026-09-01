@@ -9,10 +9,18 @@ modified_cadrille/work_dirs*/
 
 # RQ2 experiment data (never commit live outputs / geometry)
 rq2_multimodal_harness/outputs/
+rq2_multimodal_harness/qwenapikey.txt
 *.npy
 *.step
 *.stp
 *.stl
+
+# HarnessCAD runtime / frontend build artifacts
+HarnessCAD/backend/harness_runs/
+HarnessCAD/backend/harness_runs_v2/
+HarnessCAD/.venv/
+HarnessCAD/frontend/node_modules/
+HarnessCAD/frontend/dist/
 
 # Local environment and caches
 .autodl/

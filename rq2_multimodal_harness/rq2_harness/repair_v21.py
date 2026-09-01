@@ -25,6 +25,8 @@ _SCALAR_FIELDS = {
     "fillet": ("radius",),
     "chamfer": ("distance",),
     "linear_pattern": ("spacing",),
+    "sweep_profile": (),
+    "loft_profiles": (),
 }
 _VECTOR_FIELDS = {
     "box": ("center", "size"),
@@ -38,6 +40,8 @@ _VECTOR_FIELDS = {
     "fillet": (),
     "chamfer": (),
     "linear_pattern": ("direction",),
+    "sweep_profile": ("offset",),
+    "loft_profiles": (),
 }
 
 

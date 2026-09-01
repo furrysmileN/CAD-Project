@@ -84,7 +84,98 @@ Hard rules that reject plans (violating any of these fails validation):
 - All numbers must be finite. linear_pattern.count must be an integer from 2 to 32. spacing must be
   a finite number in (0.0, 8.0].
 - transform/linear_pattern source must reference the id of an EARLIER shape operation in this plan.""",
+    "v4": """You convert multimodal observations of one CAD part into a constrained HarnessCAD Plan.
+Return exactly one JSON object and no commentary. Geometry uses a canonical frame: bbox center [0,0,0]
+and longest bbox edge 1.0. The plan schema is harnesscad.plan.v3. Allowed op values are box, cylinder,
+sphere, polygon_extrude, revolve_profile, hole, slot, transform, fillet, chamfer, linear_pattern,
+sweep_profile, loft_profiles. Use 1-128 operations. Prefer sweep_profile or loft_profiles for pipes,
+springs, tapers, and gears instead of stacking boxes.
+
+polygon_extrude / revolve_profile / sweep_profile: give exactly one of a closed points/profile list
+(repeat the first point) OR a wire list. A wire starts with {kind:move,to:[u,v]} and continues with
+{kind:line,to:[u,v]} or {kind:three_point_arc,through:[u,v],to:[u,v]}, and must close.
+
+sweep_profile: exactly one of path (list of 3D points) or helix
+{radius,pitch,turns,axis:unit3,center:3}. loft_profiles needs 2-8 profiles each with points or wire
+plus offset. hole/slot must use cut. First combine is new.
+
+Do not emit Python. If ambiguous, emit a valid simpler solid rather than an incomplete op.""",
+    "v5": """You convert multimodal observations of one CAD part into a constrained HarnessCAD Plan.
+Return exactly one JSON object and no commentary. Geometry uses a canonical frame: bbox center [0,0,0]
+and longest bbox edge 1.0. The plan schema is harnesscad.plan.v3. Allowed op values are box, cylinder,
+sphere, polygon_extrude, revolve_profile, hole, slot, transform, fillet, chamfer, linear_pattern,
+sweep_profile, loft_profiles. Shape operations use combine=new/add/cut/intersect; only the first
+operation uses new. hole and slot must use cut. polygon/profile points must explicitly close by
+repeating their first point. transform and linear_pattern source must name an earlier shape operation.
+Use only global XY/XZ/YZ workplanes, finite normalized coordinates, unit 3D axes, and 1-128 operations.
+
+Every operation MUST contain exactly the required keys below:
+box: id,op,combine,center,size
+cylinder: id,op,combine,center,radius,height,axis
+sphere: id,op,combine,center,radius
+polygon_extrude: id,op,combine,workplane,points,depth,centered,offset
+revolve_profile: id,op,combine,workplane,profile,axis,angle,offset
+hole: id,op,combine,workplane,center,diameter,depth
+slot: id,op,combine,workplane,center,length,width,depth,angle
+transform: id,op,combine,source and at least one of translate or rotate
+fillet: id,op,radius; optional edge_axis X/Y/Z
+chamfer: id,op,distance; optional edge_axis X/Y/Z
+linear_pattern: id,op,combine,source,direction,count,spacing
+sweep_profile: id,op,combine,workplane,offset and exactly one of profile or wire, plus exactly one of path or helix
+loft_profiles: id,op,combine,workplane,profiles (2-8 items, each with points or wire plus offset)
+
+polygon_extrude / revolve_profile / sweep_profile: give exactly one of a closed points/profile list
+(repeat the first point) OR a wire list. A wire starts with {kind:move,to:[u,v]} and continues with
+{kind:line,to:[u,v]} or {kind:three_point_arc,through:[u,v],to:[u,v]}, and must close.
+sweep_profile helix is {radius,pitch,turns,axis:unit3,center:3}.
+
+For hole/slot, center is always a 3-number global coordinate. For cylinder, axis is always a
+3-number unit vector. Never omit a required key. If observations are ambiguous, prefer a simpler
+valid approximation over an incomplete operation. Do not emit Python, metadata, comments, or extra keys.
+
+Hard rules that reject plans (violating any of these fails validation):
+- revolve_profile.axis MUST be exactly two DIFFERENT 2D points on the workplane, e.g. [[0,0],[1,0]].
+  Two identical points such as [[0,0],[0,0]] are always invalid.
+- revolve_profile.profile must lie entirely on ONE side of the axis; it must close by repeating its
+  first point; use at least 4 points (first point repeated last).
+- transform.rotate must be {origin: 3-number point [x,y,z], axis: unit 3-vector, angle: finite degrees}.
+  origin is the 3-number global point the rotation axis passes through, NOT a 2D point.
+- cylinder.axis and linear_pattern.direction must be unit 3-vectors with norm exactly 1, e.g. [0,0,1].
+- polygon/profile vertices: no two consecutive vertices may be equal (except the closing repeat),
+  edges must not cross (no self-intersection), and at least 3 distinct vertices are required.
+- All numbers must be finite. linear_pattern.count must be an integer from 2 to 32. spacing must be
+  a finite number in (0.0, 8.0].
+- transform/linear_pattern source must reference the id of an EARLIER shape operation in this plan.
+
+Choose the generator from bbox proportions, not from part names. Prefer loft_profiles when
+two sections have different outer scales. Do not revolve a large solid rectangle to fake a hollow.
+Use only measured sizes; if an inner radius is absent, do not invent wall thickness.""",
+    "v6": """You convert multimodal observations of one CAD part into a constrained HarnessCAD semantic plan.
+Return exactly one JSON object and no commentary. Geometry uses a canonical frame: bbox center [0,0,0]
+and longest bbox edge 1.0. The schema is harnesscad.plan.v3.1. Allowed operations are all Plan v3
+operations plus sweep_path_ref.
+
+When [DECISIONS] contains path_graph_status=resolved and the observed target follows that measured
+path, emit sweep_path_ref with exactly: id,op,combine,evidence_ref. The evidence_ref must be one of
+the listed refs. A deterministic binder will insert the measured profile and line/arc path; never copy
+or alter its numeric values. This is preferred over inventing cylinders, a polyline, or a revolve.
+If the image shows additional independent features, add ordinary Plan v3.1 operations after it.
+If path evidence is unresolved or does not match the visible target, do not use sweep_path_ref.
+
+For an explicit sweep_profile, provide workplane, offset, exactly one of profile/wire, exactly one of
+path/path_wire/helix, and optional sweep_mode=fixed|frenet. A 3D path_wire starts with
+{kind:move,to:[x,y,z]}, then line segments or
+{kind:three_point_arc,through:[x,y,z],to:[x,y,z]}. Use only finite normalized coordinates.
+Shape operations use combine=new/add/cut/intersect; only the first operation uses new. hole/slot use
+cut. Use 1-128 operations. Never emit Python, comments, prose, family labels, or unlisted fields.""",
 }
+
+RAW_CADQUERY_SYSTEM = """You reconstruct one CAD part as executable CadQuery 2 Python.
+Return only a Python script. Import cadquery as cq. Build a solid and bind it to the variable result.
+Do not write files, do not import os/sys/subprocess, do not call show_object.
+Prefer sweep, loft, revolve, and helix when the part needs them. Coordinates may use millimeters;
+the evaluator will align frames."""
+
 
 PLAN_TEMPLATES = {"v1": {
     "schema_version": "harnesscad.plan.v1",
@@ -148,6 +239,68 @@ PLAN_TEMPLATES = {"v1": {
             "rotate": {"origin": [0, 0, 0], "axis": [0, 0, 1], "angle": 90},
         },
     ],
+}, "v4": {
+    "schema_version": "harnesscad.plan.v3",
+    "sample_id": "<provided sample id>",
+    "coordinate_system": {"units": "normalized", "origin": [0, 0, 0], "longest_bbox_edge": 1.0},
+    "operations": [
+        {
+            "id": "tube",
+            "op": "sweep_profile",
+            "combine": "new",
+            "workplane": "XY",
+            "profile": [[-0.08, -0.08], [0.08, -0.08], [0.08, 0.08], [-0.08, 0.08], [-0.08, -0.08]],
+            "path": [[0, 0, -0.3], [0, 0.1, 0], [0, 0, 0.3]],
+            "offset": [0, 0, 0],
+        }
+    ],
+}, "v5": {
+    "schema_version": "harnesscad.plan.v3",
+    "sample_id": "<provided sample id>",
+    "coordinate_system": {"units": "normalized", "origin": [0, 0, 0], "longest_bbox_edge": 1.0},
+    "operations": [
+        {
+            "id": "base",
+            "op": "polygon_extrude",
+            "combine": "new",
+            "workplane": "XY",
+            "points": [[-0.5, -0.25], [0.5, -0.25], [0.5, 0.25], [-0.5, 0.25], [-0.5, -0.25]],
+            "depth": 0.08,
+            "centered": True,
+            "offset": [0, 0, 0],
+        },
+        {
+            "id": "elbow",
+            "op": "revolve_profile",
+            "combine": "add",
+            "workplane": "XY",
+            "profile": [[0.22, -0.03], [0.30, -0.03], [0.30, 0.03], [0.22, 0.03], [0.22, -0.03]],
+            "axis": [[0, 0], [0, 1]],
+            "angle": 90,
+            "offset": [0, 0, 0],
+        },
+        {
+            "id": "tube_bend",
+            "op": "sweep_profile",
+            "combine": "add",
+            "workplane": "XY",
+            "profile": [[0.22, -0.03], [0.30, -0.03], [0.30, 0.03], [0.22, 0.03], [0.22, -0.03]],
+            "path": [[0, 0, 0], [0.2, 0, 0.1], [0.2, 0, 0.3]],
+            "offset": [0, 0, 0],
+        },
+    ],
+}, "v6": {
+    "schema_version": "harnesscad.plan.v3.1",
+    "sample_id": "<provided sample id>",
+    "coordinate_system": {"units": "normalized", "origin": [0, 0, 0], "longest_bbox_edge": 1.0},
+    "operations": [
+        {
+            "id": "measured_path",
+            "op": "sweep_path_ref",
+            "combine": "new",
+            "evidence_ref": "path_01",
+        }
+    ],
 }}
 
 
@@ -173,7 +326,7 @@ def build_messages(
     plan_version: str = "v1",
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     if plan_version not in SYSTEM_PROMPTS:
-        raise ValueError("plan_version 仅支持 v1 或 v2")
+        raise ValueError(f"plan_version 仅支持 {sorted(SYSTEM_PROMPTS)}")
     allowed = modalities_for(condition)
     prompt_sample_id = "s_" + hashlib.sha256(str(row["sample_id"]).encode("utf-8")).hexdigest()[:16]
     content: list[dict[str, Any]] = []
@@ -257,26 +410,67 @@ V2_REQUIRED_FIELDS = {
     "fillet": {"radius"},
     "chamfer": {"distance"},
     "linear_pattern": {"combine", "source", "direction", "count", "spacing"},
+    "sweep_profile": {"combine", "workplane", "offset"},
+    "loft_profiles": {"combine", "workplane", "profiles"},
 }
 V2_OPTIONAL_FIELDS = {
     "transform": {"translate", "rotate"},
     "fillet": {"edge_axis"},
     "chamfer": {"edge_axis"},
+    "polygon_extrude": {"points", "wire"},
+    "revolve_profile": {"profile", "wire"},
+    "sweep_profile": {"profile", "wire", "path", "helix"},
 }
+
+PLAN_V3_PROMPT_VERSIONS = frozenset({"v4", "v5"})
+PLAN_V31_PROMPT_VERSIONS = frozenset({"v6"})
+PLAN_SCHEMA_PROMPT_VERSIONS = PLAN_V3_PROMPT_VERSIONS | PLAN_V31_PROMPT_VERSIONS
+PARSE_PLAN_VERSIONS = frozenset({"v1", "v2", "v3", "v4", "v5", "v6"})
+V31_REQUIRED_FIELDS = {
+    **V2_REQUIRED_FIELDS,
+    "sweep_path_ref": {"combine", "evidence_ref"},
+}
+V31_OPTIONAL_FIELDS = {
+    **V2_OPTIONAL_FIELDS,
+    "sweep_profile": V2_OPTIONAL_FIELDS["sweep_profile"] | {"path_wire", "sweep_mode"},
+}
+
+
+def coerce_parse_version(plan_version: str) -> str:
+    """把提示词版本映射到 parse/validate 使用的 schema 检查版本。
+
+    prompt v3 仍是 Plan v2；prompt v5 与 v4 同为 Plan v3。
+    """
+    if plan_version == "v3":
+        return "v2"
+    return plan_version
 
 
 def validate_plan(plan: Any, plan_version: str | None = None) -> list[dict[str, str]]:
     issues: list[dict[str, str]] = []
     if not isinstance(plan, dict):
         return [{"path": "$", "code": "not_object"}]
-    inferred = {"harnesscad.plan.v1": "v1", "harnesscad.plan.v2": "v2"}.get(plan.get("schema_version"))
-    version = plan_version or inferred
-    if version not in {"v1", "v2"}:
+    inferred = {
+        "harnesscad.plan.v1": "v1",
+        "harnesscad.plan.v2": "v2",
+        "harnesscad.plan.v3": "v4",
+        "harnesscad.plan.v3.1": "v6",
+    }.get(plan.get("schema_version"))
+    raw_version = plan_version or inferred
+    version = coerce_parse_version(raw_version) if raw_version else raw_version
+    if version not in {"v1", "v2", "v4", "v5", "v6"}:
         return [{"path": "$.schema_version", "code": "invalid_schema_version"}]
     allowed_root = {"schema_version", "sample_id", "coordinate_system", "metadata", "operations"}
     for key in sorted(set(plan) - allowed_root):
         issues.append({"path": f"$.{key}", "code": "extra_field"})
-    if plan.get("schema_version") != f"harnesscad.plan.{version}":
+    schema_key = "v4" if version in PLAN_V3_PROMPT_VERSIONS else version
+    expected_schema = {
+        "v1": "harnesscad.plan.v1",
+        "v2": "harnesscad.plan.v2",
+        "v4": "harnesscad.plan.v3",
+        "v6": "harnesscad.plan.v3.1",
+    }[schema_key]
+    if plan.get("schema_version") != expected_schema:
         issues.append({"path": "$.schema_version", "code": "invalid_schema_version"})
     if not isinstance(plan.get("sample_id"), str):
         issues.append({"path": "$.sample_id", "code": "invalid_sample_id"})
@@ -287,7 +481,8 @@ def validate_plan(plan: Any, plan_version: str | None = None) -> list[dict[str, 
         if coordinate.get("units") != "normalized" or coordinate.get("origin") != [0, 0, 0] or coordinate.get("longest_bbox_edge") != 1.0:
             issues.append({"path": "$.coordinate_system", "code": "noncanonical_coordinate_system"})
     operations = plan.get("operations")
-    if not isinstance(operations, list) or not 1 <= len(operations) <= 64:
+    max_ops = 128 if version in PLAN_SCHEMA_PROMPT_VERSIONS else 64
+    if not isinstance(operations, list) or not 1 <= len(operations) <= max_ops:
         issues.append({"path": "$.operations", "code": "invalid_operations"})
         return issues
     seen = set()
@@ -296,7 +491,16 @@ def validate_plan(plan: Any, plan_version: str | None = None) -> list[dict[str, 
         if not isinstance(operation, dict):
             issues.append({"path": path, "code": "not_object"})
             continue
-        if version == "v1":
+        if version in PLAN_SCHEMA_PROMPT_VERSIONS:
+            kind = operation.get("op")
+            fields = V31_REQUIRED_FIELDS if version in PLAN_V31_PROMPT_VERSIONS else V2_REQUIRED_FIELDS
+            optional = V31_OPTIONAL_FIELDS if version in PLAN_V31_PROMPT_VERSIONS else V2_OPTIONAL_FIELDS
+            if kind not in fields:
+                issues.append({"path": f"{path}.op", "code": "unsupported_operation"})
+                continue
+            required = {"id", "op"} | fields[kind]
+            allowed = required | optional.get(kind, set())
+        elif version == "v1":
             kind = operation.get("primitive")
             if kind not in V1_FIELDS:
                 issues.append({"path": f"{path}.primitive", "code": "unsupported_primitive"})
@@ -322,7 +526,7 @@ def validate_plan(plan: Any, plan_version: str | None = None) -> list[dict[str, 
             combine not in {"new", "add", "cut", "intersect"} or (index == 0) != (combine == "new")
         ):
             issues.append({"path": f"{path}.combine", "code": "invalid_combine"})
-        if version == "v2" and kind in {"fillet", "chamfer"} and index == 0:
+        if version in {"v2", "v4", "v5", "v6"} and kind in {"fillet", "chamfer"} and index == 0:
             issues.append({"path": f"{path}.op", "code": "modifier_cannot_be_first"})
         if "center" in required:
             center = operation.get("center")
@@ -356,10 +560,12 @@ def _format_repair(plan: dict[str, Any], plan_version: str) -> dict[str, Any]:
                 allowed = {"id", "primitive", "combine", "center"} | V1_FIELDS.get(kind, set())
             else:
                 kind = operation.get("op")
+                fields = V31_REQUIRED_FIELDS if plan_version == "v6" else V2_REQUIRED_FIELDS
+                optional = V31_OPTIONAL_FIELDS if plan_version == "v6" else V2_OPTIONAL_FIELDS
                 allowed = (
                     {"id", "op"}
-                    | V2_REQUIRED_FIELDS.get(kind, set())
-                    | V2_OPTIONAL_FIELDS.get(kind, set())
+                    | fields.get(kind, set())
+                    | optional.get(kind, set())
                 )
             clean = {key: value for key, value in operation.items() if key in allowed}
             if "id" in clean and isinstance(clean["id"], (int, float)):
@@ -370,8 +576,9 @@ def _format_repair(plan: dict[str, Any], plan_version: str) -> dict[str, Any]:
 
 
 def parse_plan_response(text: str, plan_version: str = "v1") -> dict[str, Any]:
-    if plan_version not in {"v1", "v2"}:
-        raise ValueError("plan_version 仅支持 v1 或 v2")
+    if plan_version not in PARSE_PLAN_VERSIONS:
+        raise ValueError("plan_version 仅支持 v1、v2、v3、v4、v5 或 v6")
+    plan_version = coerce_parse_version(plan_version)
     candidate = _extract_json_candidate(text)
     repair: dict[str, Any] | None = None
     try:

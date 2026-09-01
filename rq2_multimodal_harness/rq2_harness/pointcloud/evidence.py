@@ -6,6 +6,7 @@ import numpy as np
 
 from ..common import sha256_json
 from .canonical import CanonicalTransform
+from .centerline import infer_path_graph
 from .io import clean_points, hash_points, load_point_cloud
 from .normals import estimate_normals, normal_summary
 from .primitives import fit_planes
@@ -13,7 +14,7 @@ from .sections import adaptive_thickness, query_cross_section
 from .summary import summarize
 from .symmetry import detect_mirror_symmetry
 
-EVIDENCE_SCHEMA = "point_evidence.v1"
+EVIDENCE_SCHEMA = "point_evidence.v2"
 DEFAULT_SECTION_AXES = ("XY", "XZ", "YZ")
 
 
@@ -46,7 +47,7 @@ def build_evidence(
     symmetry_sample: int = 512,
     config: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """从 .npy 点云构建 PointEvidence v1（仅依赖输入点云，不访问 GT）。
+    """从 .npy 点云构建 PointEvidence v2（仅依赖输入点云，不访问 GT）。
 
     输出字段：schema / cloud_id / frame / quality / symmetry_candidates /
     primitive_candidates / sections / hypotheses / uncertainties /
@@ -157,6 +158,7 @@ def build_evidence(
         "degenerate": False,
         "median_nn_distance": _median_nn(canonical),
     }
+    path_graph = infer_path_graph(canonical)
 
     effective_config = {
         "normals_k": normals_k,
@@ -181,6 +183,7 @@ def build_evidence(
         "symmetry_candidates": symmetry,
         "primitive_candidates": plane_candidates,
         "sections": sections,
+        "path_graph": path_graph,
         "hypotheses": hypotheses,
         "uncertainties": uncertainties,
         "config": effective_config,

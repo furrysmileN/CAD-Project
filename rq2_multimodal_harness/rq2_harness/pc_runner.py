@@ -1,6 +1,7 @@
 """原生点云几何证据（P_geom）20×9 筛选运行器。
 
-Harness 固定为 C 臂：v3 prompt + repair R4 + 最多 2 轮 schema/execution 反馈。
+Harness 固定为 C 臂：默认 v3 prompt（Plan v2）+ repair R4 + 最多 2 轮 schema/execution 反馈。
+yaml 写 arms.C.plan_version: v5 时切到 Plan v3 + 本地姿态/配方；反馈轮用同一 schema。
 点云侧：PointEvidence + 可选 FSM 工具循环。断点续跑 / --force 归档与 confirm_runner 同构。
 """
 from __future__ import annotations
@@ -36,6 +37,7 @@ from .feedback import (
     resolve_feedback_config,
 )
 from .geometry import score_step_pair
+from .measurement_binder import BindingError, bind_evidence_references
 from .pc_conditions import SCREEN_CONDITION_IDS, PCConditionSpec, validate_conditions
 from .pc_fsm import (
     ToolLoopConfig,
@@ -49,7 +51,7 @@ from .pc_prompting import audit_payload, build_pc_messages
 from .pc_tool_fsm import append_query_turn, parse_query_or_submit, run_forced_query
 from .v5_shuffle import load_shuffle_mapping
 from .pointcloud.service import PointCloudService
-from .prompting import parse_plan_response, validate_plan
+from .prompting import coerce_parse_version, parse_plan_response, validate_plan
 from .repair_v21 import REPAIR_VERSION, repair_plan_v21
 
 
@@ -199,9 +201,19 @@ def run_pc_geom(
     if not manifest_path.is_file():
         raise FileNotFoundError(f"缺少 manifest {manifest_path}")
     all_rows = list(read_jsonl(manifest_path))
-    expected_n = int(config["n"])
-    if len(all_rows) != expected_n:
-        raise RuntimeError(f"manifest 应有 {expected_n} 行，实际 {len(all_rows)}")
+    sample_filter = [str(item) for item in (config.get("sample_ids") or [])]
+    if sample_filter:
+        wanted = set(sample_filter)
+        all_rows = [row for row in all_rows if row.get("sample_id") in wanted]
+        missing = wanted - {row.get("sample_id") for row in all_rows}
+        if missing:
+            raise RuntimeError(f"manifest 缺少 sample_ids: {sorted(missing)}")
+        if len(all_rows) != len(sample_filter):
+            raise RuntimeError(f"sample_ids 过滤后行数 {len(all_rows)} != {len(sample_filter)}")
+    else:
+        expected_n = int(config["n"])
+        if len(all_rows) != expected_n:
+            raise RuntimeError(f"manifest 应有 {expected_n} 行，实际 {len(all_rows)}")
     rows = all_rows[:limit] if limit is not None else all_rows
 
     arm_block = dict((config.get("arms") or {}).get("C") or {})
@@ -209,6 +221,8 @@ def run_pc_geom(
     repair_rules = tuple((arm_block.get("repair") or {}).get("rules") or ("number", "rotate_revolve", "unit_axis", "polygon"))
     feedback = resolve_feedback_config({**config, "feedback": arm_block.get("feedback") or {"arm": "C"}})
     feedback["arm"] = "C"
+    feedback["plan_prompt_version"] = plan_version
+    parse_version = coerce_parse_version(plan_version)
 
     api_settings = APISettings.from_config(config["api"])
     if not dry_run:
@@ -479,7 +493,7 @@ def run_pc_geom(
                     classified = {"kind": "unknown", "request": classified.get("request"), "raw": raw_response}
 
                 round_record: dict[str, Any] = {"round": c_round, "temperature": round_temperature}
-                parsed = parse_plan_response(raw_response, plan_version="v2")
+                parsed = parse_plan_response(raw_response, plan_version=parse_version)
                 outcome: dict[str, Any] = {
                     "round": c_round,
                     "raw_response": raw_response,
@@ -510,8 +524,47 @@ def run_pc_geom(
                         continue
                     break
 
+                if parse_version == "v6":
+                    path_graph = (
+                        ((prompt_audit.get("guidance") or {}).get("decisions") or {}).get(
+                            "path_graph"
+                        )
+                    )
+                    semantic_plan = original_plan
+                    try:
+                        original_plan, binding_log = bind_evidence_references(
+                            semantic_plan,
+                            path_graph if isinstance(path_graph, dict) else None,
+                        )
+                    except BindingError as exc:
+                        issues = [exc.issue]
+                        round_record["failure"] = {
+                            "kind": SCHEMA_SOURCE,
+                            "issues": issues,
+                        }
+                        outcome["status"] = "binding_failed"
+                        outcome["binding_issues"] = issues
+                        outcomes.append(outcome)
+                        feedback_state["rounds"].append(round_record)
+                        status = "parse_failed"
+                        if SCHEMA_SOURCE in feedback["sources"] and c_round < max_c:
+                            current_messages = feedback_turn(
+                                messages,
+                                raw_response,
+                                _wrap_kernel_feedback(
+                                    build_schema_feedback(issues, semantic_plan, c_round),
+                                    candidate_id="cand_0" if tool_state.has_candidate else None,
+                                    tools_enabled=spec.tools,
+                                ),
+                            )
+                            c_round += 1
+                            continue
+                        break
+                    outcome["semantic_plan_sha256"] = sha256_json(semantic_plan)
+                    outcome["binding_log"] = binding_log
+
                 repaired_plan, repair_log = repair_plan_v21(original_plan, rules=repair_rules)
-                repaired_issues = validate_plan(repaired_plan, plan_version="v2")
+                repaired_issues = validate_plan(repaired_plan, plan_version=parse_version)
                 if repaired_plan.get("sample_id") != prompt_audit["prompt_sample_id"]:
                     repaired_issues = list(repaired_issues) + [{"path": "$.sample_id", "code": "sample_id_mismatch"}]
                 outcome["parsed_plan_sha256"] = sha256_json(original_plan)

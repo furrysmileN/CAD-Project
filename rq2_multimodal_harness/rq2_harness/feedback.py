@@ -61,7 +61,8 @@ def resolve_feedback_config(config: dict[str, Any]) -> dict[str, Any]:
     arm = str(block.get("arm") or "custom")
     preset = ARM_PRESETS.get(arm)
     if preset is not None:
-        block = {**block, **preset}
+        # yaml / 调用方覆盖预设，便于 C 臂显式打开 plan_prompt_version: v5
+        block = {**preset, **block}
     block["arm"] = arm
     block.setdefault("plan_prompt_version", "v2")
     block.setdefault("enabled", False)

@@ -1,0 +1,31 @@
+{
+  "schema_version": "harnesscad.plan.v1",
+  "sample_id": "example_success",
+  "coordinate_system": {
+    "units": "normalized",
+    "origin": [0.0, 0.0, 0.0],
+    "longest_bbox_edge": 1.0
+  },
+  "metadata": {
+    "condition": "example",
+    "expected": "success"
+  },
+  "operations": [
+    {
+      "id": "base",
+      "primitive": "box",
+      "combine": "new",
+      "center": [0.0, 0.0, 0.0],
+      "size": [1.0, 0.6, 0.2]
+    },
+    {
+      "id": "hole",
+      "primitive": "cylinder",
+      "combine": "cut",
+      "center": [0.0, 0.0, 0.0],
+      "radius": 0.1,
+      "height": 0.4,
+      "axis": [0.0, 0.0, 1.0]
+    }
+  ]
+}

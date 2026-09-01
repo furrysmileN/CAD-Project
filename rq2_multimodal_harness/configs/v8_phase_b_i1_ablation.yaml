@@ -1,0 +1,74 @@
+schema_version: rq2.v8.phase_b.i1.v1
+seed: 20260828
+n: 20
+repeats: 1
+repeat_ids: [1]
+conditions:
+  - I1P_bbox
+  - I1P_axes
+  - I1P_sym
+
+paths:
+  manifest: experiments/rq2_multimodal_harness/outputs/v8_residual_complementarity/manifest_n20.jsonl
+  output_root: experiments/rq2_multimodal_harness/outputs/v8_residual_complementarity/cut2_i1_ablation
+  evidence_dir: experiments/rq2_multimodal_harness/outputs/v5_complementarity/evidence
+  pointcloud_root: processed/point_clouds/benchcad
+
+arms:
+  C:
+    plan_version: v3
+    repair:
+      version: harnesscad.repair.v2.1
+      setting: R4
+      rules: [number, rotate_revolve, unit_axis, polygon]
+    feedback:
+      arm: C
+      enabled: true
+      max_rounds: 2
+      sources: [schema, execution]
+      round2_temperature: 0.3
+      keep_best: true
+
+modalities:
+  image_max_edge: 1024
+
+pointcloud:
+  density: 2048
+  seed: 42
+  normals_k: 16
+  plane_tolerance: 0.012
+  plane_max_planes: 2
+  section_thickness: null
+  symmetry_tolerance: 0.015
+  symmetry_sample: 512
+
+tools:
+  max_pre_queries: 0
+  max_post_queries: 0
+  timeout_sec: 8
+
+api:
+  env_api_key: VLM_API_KEY
+  env_base_url: VLM_BASE_URL
+  env_model: VLM_MODEL
+  default_base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+  default_model: qwen3.8-max
+  timeout_sec: 180
+  max_retries: 3
+  retry_base_sec: 2
+  request_interval_sec: 5
+  temperature: 0
+  max_tokens: 4096
+  json_mode: true
+  extra_body: {enable_thinking: false}
+
+backend:
+  episode_version: v2
+  root: HarnessCAD/HarnessCAD
+  timeout_sec: 30
+
+scoring:
+  point_samples: 2048
+  voxel_resolution: 48
+  failure_aware_tau: 0.25
+  primary_geometry: common_frame_cd
