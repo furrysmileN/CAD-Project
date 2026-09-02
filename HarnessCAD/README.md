@@ -75,11 +75,14 @@ HarnessCAD/
 │  ├─ plan_v31_schema.py      # Plan v3.1 字段与姿态约束
 │  ├─ test_plan_v3.py
 │  ├─ test_plan_v31.py
+│  ├─ compare_api.py          # 对照页后端：真值 / 输入 / 生成件
 │  └─ requirements.txt
 ├─ frontend/
-│  ├─ src/                    # React 页面与 Three.js 预览组件
+│  ├─ src/CompareApp.tsx      # 对照页：GT STL、输入图/点云/文本、生成件
+│  ├─ src/components/         # DualCadViewer / PointCloudViewer / ModelViewer
+│  ├─ src/HarnessAppV2.tsx    # Plan 校验与执行调试（对照页可进入）
 │  ├─ harness.html            # v1 页面
-│  ├─ harness-v2.html         # 推荐的 Episode v2 页面
+│  ├─ harness-v2.html         # 生成对照页（默认入口）
 │  └─ vite.config.ts
 ├─ examples/                  # 成功、空几何、断开实体示例
 ├─ start_harness.cmd
@@ -101,8 +104,12 @@ start_harness.cmd
 打开：
 
 - 首页：http://localhost:5173/
-- Episode v2：http://localhost:5173/harness-v2.html
+- 生成对照（可视化工具）：http://localhost:5173/harness-v2.html
+- Plan 执行调试：对照页加 `?debug=1`，或打开 `/harness.html`
+- 对照 API：http://127.0.0.1:8000/api/compare/cases
 - API 文档：http://127.0.0.1:8000/docs
+
+对照页需要本机 BenchCAD 渲染图、点云和实验 `outputs/`（均不入库）。没有这些数据时前后端仍可启动，案例列表为空。
 
 ## 在其他电脑上建立环境
 

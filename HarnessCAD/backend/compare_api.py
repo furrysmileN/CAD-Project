@@ -15,14 +15,27 @@ from fastapi.responses import FileResponse
 
 router = APIRouter(prefix="/api/compare", tags=["compare"])
 
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
-_RQ2_ROOT = PROJECT_ROOT / "experiments/rq2_multimodal_harness"
+
+def _detect_project_root() -> Path:
+    here = Path(__file__).resolve().parent
+    for parent in here.parents:
+        if (parent / "rq2_multimodal_harness").is_dir():
+            return parent
+        if (parent / "experiments" / "rq2_multimodal_harness").is_dir():
+            return parent
+    return here.parents[1]
+
+
+PROJECT_ROOT = _detect_project_root()
+_RQ2_ROOT = PROJECT_ROOT / "rq2_multimodal_harness"
+if not _RQ2_ROOT.is_dir():
+    _RQ2_ROOT = PROJECT_ROOT / "experiments" / "rq2_multimodal_harness"
 if str(_RQ2_ROOT) not in sys.path:
     sys.path.insert(0, str(_RQ2_ROOT))
 from rq2_harness.harness_guidance import build_guidance  # noqa: E402
 from rq2_harness.pc_conditions import parse_condition  # noqa: E402
 
-V5_ROOT = PROJECT_ROOT / "experiments/rq2_multimodal_harness/outputs/v5_complementarity"
+V5_ROOT = _RQ2_ROOT / "outputs/v5_complementarity"
 V5_STATE = V5_ROOT / "repeats/state"
 V5_METRICS = V5_ROOT / "repeats/analysis/primary_metrics.csv"
 RENDERS = PROJECT_ROOT / "processed/renders/benchcad"
@@ -31,7 +44,7 @@ POINTCLOUDS = PROJECT_ROOT / "processed/point_clouds/benchcad/2048"
 TEXT_JSONL = PROJECT_ROOT / "processed/text_descriptions/benchcad/code_gen_hdv3.jsonl"
 EVIDENCE_DIR = V5_ROOT / "evidence"
 PC_VIEWS = V5_ROOT / "pointcloud_views"
-STL_CACHE = PROJECT_ROOT / "experiments/rq2_multimodal_harness/outputs/_case_gallery/stl_cache"
+STL_CACHE = _RQ2_ROOT / "outputs/_case_gallery/stl_cache"
 
 FEATURED = (
     ("i_beam_000097_s20260505", "接近贴合的棱柱件"),
